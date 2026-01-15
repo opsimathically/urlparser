@@ -15,6 +15,30 @@
       "env": {},
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Download URLs",
+      "skipFiles": ["<node_internals>/**"],
+      "runtimeExecutable": "tsx",
+      "program": "${workspaceFolder}/${relativeFile}",
+      "args": [
+        "--crawl",
+        "CC-MAIN-2025-38",
+        "--out",
+        "urls.txt",
+        "--maxIndexFiles",
+        "2",
+        "--maxUrls",
+        "500000"
+      ],
+      "cwd": "${workspaceFolder}",
+      "outFiles": ["${workspaceFolder}/**/*.js"],
+      "sourceMaps": true,
+      "env": {},
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
     }
   ]
 }

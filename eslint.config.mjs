@@ -5,7 +5,12 @@ import tseslint from 'typescript-eslint';
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'eslint.config.mjs']
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'eslint.config.mjs',
+      'ts-to-zod.config.mjs'
+    ]
   },
   { files: ['**/*.{js,mjs,cjs,ts}'] },
   {

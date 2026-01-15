@@ -1,37 +1,39 @@
 import test from 'node:test';
 import assert from 'node:assert';
-
 import { URLParser } from '@src/classes/urlparser/URLParser.class';
-
-import { unusual_or_bad_urls } from './badurls/badurls';
+import { URLFuzzer } from '@src/index';
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%% Test Definitions %%%%%%%%%%%%%%%%%%%%%%%
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-test('Arbitrary test(s).', async function () {
+test('Test url parser utilizing parsable/unparsable urls generated via fuzzer.', async function () {
+  const url_fuzzer = new URLFuzzer({
+    complexityBias: 1,
+    complexityWeightingStrength: 1,
+    includeTrickyValidCases: true
+  });
+
+  // generate parsable/unparsable urls
+  const parsable_urls = url_fuzzer.genParsableURLs(1000);
+  const unparsable_urls = url_fuzzer.genUnparsableURLs(1000);
+
   const urlparser = new URLParser();
 
-  const basic_test_urls = [
-    // 'whatever://example.com:45/something_blah.php?a=1&b=2&c=3&d&e&f=4&=g&=h',
-    'http://example.com:99999:999/',
-    'whatever://Someuser:Something@example.com:45/something///////abcd1234/56/id=1/weird=string/something_blah.php?a=1&b=2&c=3&d&e&f=4&=g&=h',
-    'whatever://example.com',
-    'whatever://example.com',
-
-    'https://example.com',
-    'https://example.com/'
-  ];
-
-  for (let idx = 0; idx < basic_test_urls.length; idx++) {
-    const url = basic_test_urls[idx];
+  for (let idx = 0; idx < parsable_urls.length; idx++) {
+    const url = parsable_urls[idx];
     const parsed_url = urlparser.parse(url);
-    debugger;
+    if (parsed_url.indicators.failures.failed_basic_parsing) {
+      debugger;
+    }
   }
 
-  for (let idx = 0; idx < unusual_or_bad_urls.length; idx++) {
-    const url = unusual_or_bad_urls[idx];
+  for (let idx = 0; idx < unparsable_urls.length; idx++) {
+    const url = unparsable_urls[idx];
     const parsed_url = urlparser.parse(url);
+    if (!parsed_url.indicators.failures.failed_basic_parsing) {
+      debugger;
+    }
   }
 
   // record set should be empty array now

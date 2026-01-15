@@ -241,7 +241,7 @@ export class URLParser {
       }
     };
 
-    // attempt to parse the crawl target
+    // 1) Use built in URL parser to parse.
     let parsed_url: URL | null = null;
     try {
       // Note:
@@ -260,6 +260,7 @@ export class URLParser {
       return final_urlparse_data;
     }
 
+    //
     final_urlparse_data.scheme_and_port_info =
       urlparser_ref.parseSchemeAndPortInfo({
         url: parsed_url,
