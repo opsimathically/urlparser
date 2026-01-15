@@ -1,4 +1,4 @@
-export type Url_diagnostic_issue = {
+export type url_diagnostic_issue_t = {
   code: string;
   message: string;
   offset: number;
@@ -9,32 +9,32 @@ export type Url_diagnostic_issue = {
   severity: 'fatal' | 'warning';
 };
 
-type Node_url_error = {
+type node_url_error_t = {
   name: string;
   message: string;
   code?: string;
 };
 
-export type Url_diagnostic_result =
+export type url_diagnostic_result_t =
   | {
       ok: true;
       url: URL;
       normalized: string;
-      issues: Url_diagnostic_issue[];
+      issues: url_diagnostic_issue_t[];
     }
   | {
       ok: false;
-      issues: Url_diagnostic_issue[];
-      node_error?: Node_url_error;
+      issues: url_diagnostic_issue_t[];
+      node_error?: node_url_error_t;
     };
 
-type Parser_context = {
+type parser_context_t = {
   input: string;
   base?: string;
-  issues: Url_diagnostic_issue[];
+  issues: url_diagnostic_issue_t[];
 };
 
-type Parsed_components = {
+type parsed_components_t = {
   scheme: string;
   has_authority: boolean;
   username: string;
@@ -47,16 +47,16 @@ type Parsed_components = {
 };
 
 export class VerboseURLAnalyticParser {
-  public analyzeUrl(input: string, base?: string): Url_diagnostic_result {
-    let parser_context: Parser_context = { input, base, issues: [] };
+  public analyzeUrl(input: string, base?: string): url_diagnostic_result_t {
+    let parser_context_t: parser_context_t = { input, base, issues: [] };
 
     // WHATWG: strip leading/trailing C0 controls and space from input.
     // Node follows this behavior; we also report it (warning) because it matters for diagnostics.
-    parser_context = this.stripC0AndSpace(parser_context);
+    parser_context_t = this.stripC0AndSpace(parser_context_t);
 
     // Fast fatal: empty after stripping.
-    if (parser_context.input.length === 0) {
-      this.pushIssue(parser_context, {
+    if (parser_context_t.input.length === 0) {
+      this.pushIssue(parser_context_t, {
         code: 'empty_input',
         message:
           'Input is empty after stripping leading/trailing C0 controls and spaces.',
@@ -64,52 +64,52 @@ export class VerboseURLAnalyticParser {
         length: 0,
         severity: 'fatal'
       });
-      return this.fail(parser_context, input, base);
+      return this.fail(parser_context_t, input, base);
     }
 
     // Detect illegal internal ASCII whitespace early (common root cause).
     // WHATWG sometimes percent-encodes in path/query; BUT in host it is forbidden and often fatal.
     // We do not immediately fail on whitespace in general; we locate it and validate by component later.
     const whitespace_offset: number = this.findAsciiWhitespace(
-      parser_context.input
+      parser_context_t.input
     );
     if (whitespace_offset !== -1) {
-      this.pushIssue(parser_context, {
+      this.pushIssue(parser_context_t, {
         code: 'ascii_whitespace_present',
         message:
           'ASCII whitespace is present in the input. This is typically not allowed in hosts and often causes parsing failure.',
         offset: whitespace_offset,
         length: 1,
-        found: parser_context.input[whitespace_offset],
+        found: parser_context_t.input[whitespace_offset],
         severity: 'warning'
       });
     }
 
     // Parse with a simplified WHATWG-inspired flow:
     // 1) Determine if input is absolute (has a valid scheme), else it is relative and requires base.
-    const scheme_parse = this.parseScheme(parser_context.input);
+    const scheme_parse = this.parseScheme(parser_context_t.input);
 
     if (!scheme_parse.has_scheme) {
       // Relative URL without a base is a primary reason Node's new URL() throws.
       if (!base) {
-        this.pushIssue(parser_context, {
+        this.pushIssue(parser_context_t, {
           code: 'relative_url_without_base',
           message: 'Relative URL provided without a base URL.',
           offset: 0,
-          length: parser_context.input.length,
+          length: parser_context_t.input.length,
           severity: 'fatal',
           expected: 'An absolute URL (with scheme) or a valid base URL.'
         });
-        return this.fail(parser_context, input, base);
+        return this.fail(parser_context_t, input, base);
       }
 
       // We still run Node oracle below; diagnostics for base validity as well.
-      return this.oracleWithBase(parser_context, input, base);
+      return this.oracleWithBase(parser_context_t, input, base);
     }
 
     // Scheme exists; validate it precisely.
     if (!scheme_parse.is_valid) {
-      this.pushIssue(parser_context, {
+      this.pushIssue(parser_context_t, {
         code: 'invalid_scheme',
         message:
           "Scheme is invalid. A scheme must start with an ASCII letter and contain only ASCII alphanumerics, '+', '-', '.'.",
@@ -118,44 +118,44 @@ export class VerboseURLAnalyticParser {
         found: scheme_parse.found,
         severity: 'fatal'
       });
-      return this.fail(parser_context, input, base);
+      return this.fail(parser_context_t, input, base);
     }
 
     // Parse main components from the post-scheme remainder.
-    const parsed_components = this.parseAfterScheme(
-      parser_context,
+    const parsed_components_t = this.parseAfterScheme(
+      parser_context_t,
       scheme_parse.scheme,
       scheme_parse.after_scheme_offset
     );
 
     // Validate according to special-scheme authority expectations (WHATWG “special schemes”).
     const is_special_scheme: boolean = this.isSpecialScheme(
-      parsed_components.scheme
+      parsed_components_t.scheme
     );
 
     if (is_special_scheme) {
       // For special schemes, `//` indicates authority; absence can be allowed but commonly fails if host is required by consumer.
       // Node generally accepts e.g. "http:example.com" as path-like, but many expect "//".
       // We do not fail here, but we do validate host strongly when authority is present.
-      if (parsed_components.has_authority) {
+      if (parsed_components_t.has_authority) {
         // Host must be non-empty for http/https/ws/wss/ftp.
-        if (parsed_components.host.length === 0) {
-          this.pushIssue(parser_context, {
+        if (parsed_components_t.host.length === 0) {
+          this.pushIssue(parser_context_t, {
             code: 'missing_host',
-            message: `Host is missing after authority marker ('//') for special scheme '${parsed_components.scheme}'.`,
+            message: `Host is missing after authority marker ('//') for special scheme '${parsed_components_t.scheme}'.`,
             offset: scheme_parse.after_scheme_offset + 2, // approx: after "://"
             length: 0,
             severity: 'fatal'
           });
-          return this.fail(parser_context, input, base);
+          return this.fail(parser_context_t, input, base);
         }
 
         // Forbidden host code points (WHATWG concept).
         const forbidden = this.findForbiddenHostCodePoint(
-          parsed_components.host
+          parsed_components_t.host
         );
         if (forbidden) {
-          this.pushIssue(parser_context, {
+          this.pushIssue(parser_context_t, {
             code: 'forbidden_host_code_point',
             message:
               'Host contains a forbidden code point for a special-scheme URL.',
@@ -165,37 +165,37 @@ export class VerboseURLAnalyticParser {
             severity: 'fatal',
             context: forbidden.context
           });
-          return this.fail(parser_context, input, base);
+          return this.fail(parser_context_t, input, base);
         }
 
         // IPv6 bracket semantics and basic validation.
-        const ipv6_issue = this.validateIpv6Literal(parsed_components.host);
+        const ipv6_issue = this.validateIpv6Literal(parsed_components_t.host);
         if (ipv6_issue) {
-          this.pushIssue(parser_context, ipv6_issue);
-          return this.fail(parser_context, input, base);
+          this.pushIssue(parser_context_t, ipv6_issue);
+          return this.fail(parser_context_t, input, base);
         }
 
         // Port semantics.
         const port_issue = this.validatePort(
-          parsed_components.port,
-          parsed_components.scheme,
+          parsed_components_t.port,
+          parsed_components_t.scheme,
           scheme_parse.after_scheme_offset,
-          parser_context.input
+          parser_context_t.input
         );
         if (port_issue) {
-          this.pushIssue(parser_context, port_issue);
-          return this.fail(parser_context, input, base);
+          this.pushIssue(parser_context_t, port_issue);
+          return this.fail(parser_context_t, input, base);
         }
       }
     } else {
       // Non-special schemes may use opaque paths; host parsing is not always required.
       // However, "scheme://" still implies authority parsing.
-      if (parsed_components.has_authority) {
+      if (parsed_components_t.has_authority) {
         const forbidden = this.findForbiddenHostCodePoint(
-          parsed_components.host
+          parsed_components_t.host
         );
         if (forbidden) {
-          this.pushIssue(parser_context, {
+          this.pushIssue(parser_context_t, {
             code: 'forbidden_host_code_point',
             message: 'Host contains a forbidden code point.',
             offset: forbidden.offset,
@@ -204,38 +204,40 @@ export class VerboseURLAnalyticParser {
             severity: 'fatal',
             context: forbidden.context
           });
-          return this.fail(parser_context, input, base);
+          return this.fail(parser_context_t, input, base);
         }
 
         const port_issue = this.validatePort(
-          parsed_components.port,
-          parsed_components.scheme,
+          parsed_components_t.port,
+          parsed_components_t.scheme,
           scheme_parse.after_scheme_offset,
-          parser_context.input
+          parser_context_t.input
         );
         if (port_issue) {
-          this.pushIssue(parser_context, port_issue);
-          return this.fail(parser_context, input, base);
+          this.pushIssue(parser_context_t, port_issue);
+          return this.fail(parser_context_t, input, base);
         }
       }
     }
 
     // Final: use Node’s URL as oracle to confirm behavior.
-    return this.oracle(parser_context, input, base);
+    return this.oracle(parser_context_t, input, base);
   }
 
   // -------------------------
   // Core WHATWG-ish steps
   // -------------------------
 
-  private stripC0AndSpace(parser_context: Parser_context): Parser_context {
-    const original_input: string = parser_context.input;
+  private stripC0AndSpace(
+    parser_context_t: parser_context_t
+  ): parser_context_t {
+    const original_input: string = parser_context_t.input;
 
     const leading = this.countLeadingC0AndSpace(original_input);
     const trailing = this.countTrailingC0AndSpace(original_input);
 
     if (leading > 0 || trailing > 0) {
-      this.pushIssue(parser_context, {
+      this.pushIssue(parser_context_t, {
         code: 'stripped_c0_or_space',
         message:
           'Leading/trailing C0 control codes and/or spaces were stripped per WHATWG parsing behavior.',
@@ -245,13 +247,13 @@ export class VerboseURLAnalyticParser {
         context: `leading_stripped=${leading}, trailing_stripped=${trailing}`
       });
 
-      parser_context.input = original_input.slice(
+      parser_context_t.input = original_input.slice(
         leading,
         original_input.length - trailing
       );
     }
 
-    return parser_context;
+    return parser_context_t;
   }
 
   private parseScheme(input: string): {
@@ -327,11 +329,11 @@ export class VerboseURLAnalyticParser {
   }
 
   private parseAfterScheme(
-    parser_context: Parser_context,
+    parser_context_t: parser_context_t,
     scheme: string,
     after_scheme_offset: number
-  ): Parsed_components {
-    const input: string = parser_context.input;
+  ): parsed_components_t {
+    const input: string = parser_context_t.input;
 
     // After scheme ":" we may have "//" (authority), or opaque/path.
     let cursor: number = after_scheme_offset;
@@ -454,7 +456,7 @@ export class VerboseURLAnalyticParser {
     return special_schemes.has(scheme);
   }
 
-  private validateIpv6Literal(host: string): Url_diagnostic_issue | null {
+  private validateIpv6Literal(host: string): url_diagnostic_issue_t | null {
     if (!host.startsWith('[')) return null;
 
     const rb_index: number = host.indexOf(']');
@@ -503,7 +505,7 @@ export class VerboseURLAnalyticParser {
     scheme: string,
     after_scheme_offset: number,
     full_input: string
-  ): Url_diagnostic_issue | null {
+  ): url_diagnostic_issue_t | null {
     if (port.length === 0) return null;
 
     if (!/^[0-9]+$/.test(port)) {
@@ -619,10 +621,10 @@ export class VerboseURLAnalyticParser {
   // -------------------------
 
   private oracle(
-    parser_context: Parser_context,
+    parser_context_t: parser_context_t,
     original_input: string,
     base?: string
-  ): Url_diagnostic_result {
+  ): url_diagnostic_result_t {
     try {
       const url = base
         ? new URL(original_input, base)
@@ -631,25 +633,25 @@ export class VerboseURLAnalyticParser {
         ok: true,
         url,
         normalized: url.toString(),
-        issues: parser_context.issues
+        issues: parser_context_t.issues
       };
     } catch (err) {
-      return this.fail(parser_context, original_input, base, err);
+      return this.fail(parser_context_t, original_input, base, err);
     }
   }
 
   private oracleWithBase(
-    parser_context: Parser_context,
+    parser_context_t: parser_context_t,
     original_input: string,
     base: string
-  ): Url_diagnostic_result {
+  ): url_diagnostic_result_t {
     // Validate base separately because Node can throw due to invalid base.
     try {
       // If base is invalid, this will throw.
       // We do not store it; we only want to detect and report a focused diagnostic.
       new URL(base);
     } catch (err) {
-      this.pushIssue(parser_context, {
+      this.pushIssue(parser_context_t, {
         code: 'invalid_base_url',
         message:
           'Base URL is invalid; cannot resolve a relative URL against it.',
@@ -658,21 +660,21 @@ export class VerboseURLAnalyticParser {
         found: base,
         severity: 'fatal'
       });
-      return this.fail(parser_context, original_input, base, err);
+      return this.fail(parser_context_t, original_input, base, err);
     }
 
-    return this.oracle(parser_context, original_input, base);
+    return this.oracle(parser_context_t, original_input, base);
   }
 
   private fail(
-    parser_context: Parser_context,
+    parser_context_t: parser_context_t,
     original_input: string,
     base?: string,
     err?: unknown
-  ): Url_diagnostic_result {
+  ): url_diagnostic_result_t {
     // Always include Node error details when available; Node typically throws TypeError with code ERR_INVALID_URL.
-    let node_error: Node_url_error | undefined = undefined;
-    // let node_error: Url_diagnostic_result['node_error'] | undefined = undefined;
+    let node_error: node_url_error_t | undefined = undefined;
+    // let node_error: url_diagnostic_result_t['node_error'] | undefined = undefined;
 
     if (err && err instanceof Error) {
       const any_err = err as unknown as { code?: string };
@@ -701,12 +703,12 @@ export class VerboseURLAnalyticParser {
       }
     }
 
-    // Ensure we have at least one fatal issue, even if parser_context only contains warnings.
-    const has_fatal: boolean = parser_context.issues.some(
+    // Ensure we have at least one fatal issue, even if parser_context_t only contains warnings.
+    const has_fatal: boolean = parser_context_t.issues.some(
       (i) => i.severity === 'fatal'
     );
     if (!has_fatal) {
-      this.pushIssue(parser_context, {
+      this.pushIssue(parser_context_t, {
         code: 'invalid_url',
         message:
           'URL is invalid under WHATWG parsing rules as implemented by Node.',
@@ -718,7 +720,7 @@ export class VerboseURLAnalyticParser {
 
     return {
       ok: false,
-      issues: parser_context.issues,
+      issues: parser_context_t.issues,
       node_error
     };
   }
@@ -728,10 +730,10 @@ export class VerboseURLAnalyticParser {
   // -------------------------
 
   private pushIssue(
-    parser_context: Parser_context,
-    issue: Url_diagnostic_issue
+    parser_context_t: parser_context_t,
+    issue: url_diagnostic_issue_t
   ): void {
-    parser_context.issues.push(issue);
+    parser_context_t.issues.push(issue);
   }
 
   private countLeadingC0AndSpace(input: string): number {

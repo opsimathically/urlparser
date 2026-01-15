@@ -14,9 +14,9 @@ import { URLFuzzer } from '@src/classes/urlfuzzer/URLFuzzer.class';
 
 test('Test verbose parser (good parse/bad parse)', async function () {
   const url_fuzzer = new URLFuzzer({
-    complexityBias: 1,
-    complexityWeightingStrength: 1,
-    includeTrickyValidCases: true
+    complexity_bias: 1,
+    complexity_weighting_strength: 1,
+    include_tricky_valid_cases: true
   });
 
   // generate parsable/unparsable urls

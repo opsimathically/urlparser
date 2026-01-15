@@ -11,7 +11,7 @@
  * - genUnparsableURLs: intended to throw in `new URL(url)` (no base URL)
  */
 
-type UrlGenerationOptions = {
+type url_generation_options_t = {
   seed?: number;
 
   /**
@@ -19,30 +19,30 @@ type UrlGenerationOptions = {
    * - 0 => mostly simple
    * - 1 => mostly complex
    */
-  complexityBias?: number;
+  complexity_bias?: number;
 
-  includeTrickyValidCases?: boolean;
+  include_tricky_valid_cases?: boolean;
 
   /**
    * Strength of complexity bias within weightedPick.
    * 0 => weightedPick ignores complexity (but other logic still uses it)
    * 1 => strong push toward later options as complexity grows
    */
-  complexityWeightingStrength?: number;
+  complexity_weighting_strength?: number;
 };
 
 export class URLFuzzer {
   private rng: () => number;
-  private complexityBias: number;
-  private includeTrickyValidCases: boolean;
-  private complexityWeightingStrength: number;
+  private complexity_bias: number;
+  private include_tricky_valid_cases: boolean;
+  private complexity_weighting_strength: number;
 
-  constructor(opts: UrlGenerationOptions = {}) {
+  constructor(opts: url_generation_options_t = {}) {
     this.rng = this.makeRng(opts.seed);
-    this.complexityBias = this.clamp(opts.complexityBias ?? 0.5, 0, 1);
-    this.includeTrickyValidCases = !!opts.includeTrickyValidCases;
-    this.complexityWeightingStrength = this.clamp(
-      opts.complexityWeightingStrength ?? 0.85,
+    this.complexity_bias = this.clamp(opts.complexity_bias ?? 0.5, 0, 1);
+    this.include_tricky_valid_cases = !!opts.include_tricky_valid_cases;
+    this.complexity_weighting_strength = this.clamp(
+      opts.complexity_weighting_strength ?? 0.85,
       0,
       1
     );
@@ -69,7 +69,7 @@ export class URLFuzzer {
     const scheme = this.pickOne(['http', 'https', 'ws', 'wss', 'ftp']);
 
     // Order matters: later entries are treated as "more complex" by weightedPick.
-    const authorityType = this.weightedPick(
+    const authority_type = this.weightedPick(
       [
         { v: 'domain', w: 0.75 },
         { v: 'ipv4', w: 0.15 },
@@ -79,30 +79,29 @@ export class URLFuzzer {
     );
 
     const host =
-      authorityType === 'domain'
+      authority_type === 'domain'
         ? this.generateDomain(complexity)
-        : authorityType === 'ipv4'
+        : authority_type === 'ipv4'
           ? this.generateIPv4(complexity)
           : this.wrapIPv6(this.generateIPv6(complexity));
 
-    const includeAuth = this.prob(0.15 + 0.5 * complexity);
-    const includePort = this.prob(0.2 + 0.55 * complexity);
-    const includePath = this.prob(0.55 + 0.4 * complexity);
-    const includeQuery = this.prob(0.35 + 0.55 * complexity);
-    const includeFragment = this.prob(0.2 + 0.45 * complexity);
+    const include_auth = this.prob(0.15 + 0.5 * complexity);
+    const include_port = this.prob(0.2 + 0.55 * complexity);
+    const include_path = this.prob(0.55 + 0.4 * complexity);
+    const include_query = this.prob(0.35 + 0.55 * complexity);
+    const include_fragment = this.prob(0.2 + 0.45 * complexity);
 
-    const userInfo = includeAuth ? this.generateUserInfo(complexity) : '';
-    const port = includePort ? `:${this.generatePort(complexity)}` : '';
+    const user_info = include_auth ? this.generateuser_info(complexity) : '';
+    const port = include_port ? `:${this.generatePort(complexity)}` : '';
 
-    const path = includePath ? this.generatePath(complexity) : '/';
-    const query = includeQuery ? this.generateQuery(complexity) : '';
-    const fragment = includeFragment ? this.generateFragment(complexity) : '';
+    const path = include_path ? this.generatePath(complexity) : '/';
+    const query = include_query ? this.generateQuery(complexity) : '';
+    const fragment = include_fragment ? this.generateFragment(complexity) : '';
 
-    const url = `${scheme}://${userInfo}${host}${port}${path}${query}${fragment}`;
+    const url = `${scheme}://${user_info}${host}${port}${path}${query}${fragment}`;
 
     // Guarantee parsable output.
     try {
-      // eslint-disable-next-line no-new
       new URL(url);
       return url;
     } catch {
@@ -114,9 +113,9 @@ export class URLFuzzer {
     const tlds = ['com', 'net', 'org', 'io', 'dev', 'info', 'co', 'app'];
     const tld = this.pickOne(tlds);
 
-    const labelCount = this.intBetween(2, 2 + Math.floor(3 * complexity)); // 2..5
+    const label_count = this.intBetween(2, 2 + Math.floor(3 * complexity)); // 2..5
     const labels: string[] = [];
-    for (let i = 0; i < labelCount; i++)
+    for (let i = 0; i < label_count; i++)
       labels.push(this.generateDnsLabel(complexity));
 
     if (this.prob(0.1 * complexity)) {
@@ -127,9 +126,9 @@ export class URLFuzzer {
   }
 
   private generateDnsLabel(complexity: number): string {
-    const minLen = 3;
-    const maxLen = 6 + Math.floor(10 * complexity); // up to ~16
-    const len = this.intBetween(minLen, maxLen);
+    const min_len = 3;
+    const max_len = 6 + Math.floor(10 * complexity); // up to ~16
+    const len = this.intBetween(min_len, max_len);
 
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     let label = '';
@@ -142,11 +141,13 @@ export class URLFuzzer {
     return label;
   }
 
-  private generateUserInfo(complexity: number): string {
-    const user = this.generateToken('user', complexity, { allowPercent: true });
-    const includePass = this.prob(0.35 + 0.45 * complexity);
-    const pass = includePass
-      ? `:${this.generateToken('pass', complexity, { allowPercent: true })}`
+  private generateuser_info(complexity: number): string {
+    const user = this.generateToken('user', complexity, {
+      allow_percent: true
+    });
+    const include_pass = this.prob(0.35 + 0.45 * complexity);
+    const pass = include_pass
+      ? `:${this.generateToken('pass', complexity, { allow_percent: true })}`
       : '';
     return `${user}${pass}@`;
   }
@@ -156,8 +157,8 @@ export class URLFuzzer {
 
     // Low complexity: stick to common ports more often.
     // High complexity: explore more arbitrary ports.
-    const useCommon = this.prob(this.lerp(0.75, 0.35, complexity));
-    if (useCommon) return this.pickOne(common);
+    const use_common = this.prob(this.lerp(0.75, 0.35, complexity));
+    if (use_common) return this.pickOne(common);
 
     // High complexity: include more edge-ish values (1, 65535) sometimes.
     if (this.prob(0.08 + 0.12 * complexity))
@@ -166,11 +167,11 @@ export class URLFuzzer {
   }
 
   private generatePath(complexity: number): string {
-    const segmentCount = this.intBetween(0, 1 + Math.floor(6 * complexity)); // 0..7
-    if (segmentCount === 0) return '/';
+    const segment_count = this.intBetween(0, 1 + Math.floor(6 * complexity)); // 0..7
+    if (segment_count === 0) return '/';
 
     const segments: string[] = [];
-    for (let i = 0; i < segmentCount; i++) {
+    for (let i = 0; i < segment_count; i++) {
       // Order matters: later options = “more complex”
       const kind = this.weightedPick(
         [
@@ -185,8 +186,8 @@ export class URLFuzzer {
       if (kind === 'word') {
         segments.push(
           this.generateToken('seg', complexity, {
-            allowPercent:
-              this.includeTrickyValidCases && this.prob(0.35 * complexity)
+            allow_percent:
+              this.include_tricky_valid_cases && this.prob(0.35 * complexity)
           })
         );
       } else if (kind === 'id') {
@@ -198,8 +199,8 @@ export class URLFuzzer {
       }
     }
 
-    const trailingSlash = this.prob(0.2 + 0.25 * complexity) ? '/' : '';
-    return `/${segments.join('/')}${trailingSlash}`;
+    const trailing_slash = this.prob(0.2 + 0.25 * complexity) ? '/' : '';
+    return `/${segments.join('/')}${trailing_slash}`;
   }
 
   private generateFilename(complexity: number): string {
@@ -229,16 +230,16 @@ export class URLFuzzer {
       this.prob(0.5) ? this.generateToken('q', complexity) : 'v'
     ];
     let s = parts.join(this.pickOne(['_', '-', '.']));
-    if (this.includeTrickyValidCases && this.prob(0.25 * complexity))
+    if (this.include_tricky_valid_cases && this.prob(0.25 * complexity))
       s = this.percentEncodeSome(s);
     return s;
   }
 
   private generateQuery(complexity: number): string {
-    const paramCount = this.intBetween(1, 2 + Math.floor(8 * complexity)); // 1..10
+    const param_count = this.intBetween(1, 2 + Math.floor(8 * complexity)); // 1..10
     const params: string[] = [];
 
-    const commonKeys = [
+    const common_keys = [
       'q',
       'query',
       'page',
@@ -259,13 +260,13 @@ export class URLFuzzer {
       'utm_campaign'
     ];
 
-    for (let i = 0; i < paramCount; i++) {
+    for (let i = 0; i < param_count; i++) {
       const key = this.prob(0.65)
-        ? this.pickOne(commonKeys)
-        : this.generateToken('k', complexity, { maxLen: 12 });
+        ? this.pickOne(common_keys)
+        : this.generateToken('k', complexity, { max_len: 12 });
 
       // Order matters: later kinds = “more complex”
-      const valueKind = this.weightedPick(
+      const value_kind = this.weightedPick(
         [
           { v: 'word', w: 0.3 },
           { v: 'number', w: 0.2 },
@@ -279,11 +280,11 @@ export class URLFuzzer {
       );
 
       let value: string;
-      switch (valueKind) {
+      switch (value_kind) {
         case 'word':
           value = this.generateToken('v', complexity, {
-            allowSpaces:
-              this.includeTrickyValidCases && this.prob(0.25 * complexity)
+            allow_spaces:
+              this.include_tricky_valid_cases && this.prob(0.25 * complexity)
           });
           break;
         case 'number':
@@ -299,8 +300,8 @@ export class URLFuzzer {
           break;
         case 'token':
           value = this.generateToken('t', complexity, {
-            allowPercent: true,
-            maxLen: 24
+            allow_percent: true,
+            max_len: 24
           });
           break;
         case 'miniurl':
@@ -320,9 +321,9 @@ export class URLFuzzer {
           value = this.generateToken('v', complexity);
       }
 
-      const encodedKey = this.safeEncodeQueryComponent(key);
-      const encodedValue = this.safeEncodeQueryComponent(value);
-      params.push(`${encodedKey}=${encodedValue}`);
+      const encoded_key = this.safeEncodeQueryComponent(key);
+      const encoded_value = this.safeEncodeQueryComponent(value);
+      params.push(`${encoded_key}=${encoded_value}`);
     }
 
     if (this.prob(0.1 + 0.2 * complexity)) {
@@ -356,11 +357,11 @@ export class URLFuzzer {
     let frag: string;
     if (kind === 'anchor') frag = this.generateToken('section', complexity);
     else if (kind === 'state')
-      frag = `state=${encodeURIComponent(this.generateToken('s', complexity, { allowPercent: true }))}`;
+      frag = `state=${encodeURIComponent(this.generateToken('s', complexity, { allow_percent: true }))}`;
     else
       frag = `/app/${this.generateToken('view', complexity)}/${this.intBetween(1, 999)}`;
 
-    if (this.includeTrickyValidCases && this.prob(0.2 * complexity))
+    if (this.include_tricky_valid_cases && this.prob(0.2 * complexity))
       frag = this.percentEncodeSome(frag);
     return `#${frag}`;
   }
@@ -371,47 +372,47 @@ export class URLFuzzer {
 
   private generateUnparsableUrl(): string {
     const pattern = this.pickOne([
-      'invalidSchemeChar',
-      'missingSchemeNoBase',
-      'badIPv6Literal',
-      'schemeMissingColon',
-      'illegalWhitespaceInScheme',
-      'nonsensePrefix',
-      'invalidAuthoritySlashes',
-      'unclosedBracket'
+      'invalid_scheme_char',
+      'missing_scheme_no_base',
+      'bad_ipv6_literal',
+      'scheme_missing_colon',
+      'illegal_whitespace_in_scheme',
+      'nonsense_prefix',
+      'invalid_authority_slashes',
+      'unclosed_bracket'
     ] as const);
 
     let candidate = '';
     switch (pattern) {
-      case 'invalidSchemeChar':
+      case 'invalid_scheme_char':
         candidate = `ht*tp://example.com/${this.generateToken('x', 0.4)}`;
         break;
 
-      case 'missingSchemeNoBase':
+      case 'missing_scheme_no_base':
         candidate = `//${this.generateDomain(0.5)}/${this.generateToken('path', 0.5)}`;
         break;
 
-      case 'badIPv6Literal':
+      case 'bad_ipv6_literal':
         candidate = `http://[2001:db8:::1]/`;
         break;
 
-      case 'schemeMissingColon':
+      case 'scheme_missing_colon':
         candidate = `https//${this.generateDomain(0.4)}/${this.generateToken('p', 0.4)}`;
         break;
 
-      case 'illegalWhitespaceInScheme':
+      case 'illegal_whitespace_in_scheme':
         candidate = `ht tp://example.com/`;
         break;
 
-      case 'nonsensePrefix':
+      case 'nonsense_prefix':
         candidate = `???${this.generateToken('x', 0.4)}://example.com/`;
         break;
 
-      case 'invalidAuthoritySlashes':
+      case 'invalid_authority_slashes':
         candidate = `http:/\\${this.generateDomain(0.4)}/`;
         break;
 
-      case 'unclosedBracket':
+      case 'unclosed_bracket':
         candidate = `http://[2001:db8::1/`;
         break;
     }
@@ -426,7 +427,6 @@ export class URLFuzzer {
 
   private isUnparsable(url: string): boolean {
     try {
-      // eslint-disable-next-line no-new
       new URL(url);
       return false;
     } catch {
@@ -541,14 +541,14 @@ export class URLFuzzer {
     prefix: string,
     complexity: number,
     opts: {
-      allowPercent?: boolean;
-      allowSpaces?: boolean;
-      maxLen?: number;
+      allow_percent?: boolean;
+      allow_spaces?: boolean;
+      max_len?: number;
     } = {}
   ): string {
-    const maxLen = opts.maxLen ?? 6 + Math.floor(12 * complexity);
-    const minLen = Math.max(2, Math.floor(maxLen / 3));
-    const len = this.intBetween(minLen, maxLen);
+    const max_len = opts.max_len ?? 6 + Math.floor(12 * complexity);
+    const min_len = Math.max(2, Math.floor(max_len / 3));
+    const len = this.intBetween(min_len, max_len);
 
     const alpha = 'abcdefghijklmnopqrstuvwxyz';
     const alnum = alpha + '0123456789';
@@ -560,12 +560,12 @@ export class URLFuzzer {
 
     while (s.length < len) s += pool[this.intBetween(0, pool.length - 1)];
 
-    if (opts.allowSpaces && this.prob(0.25)) {
+    if (opts.allow_spaces && this.prob(0.25)) {
       const idx = this.intBetween(1, Math.max(1, s.length - 2));
       s = s.slice(0, idx) + ' ' + s.slice(idx);
     }
 
-    if (opts.allowPercent && this.prob(0.3)) s = this.percentEncodeSome(s);
+    if (opts.allow_percent && this.prob(0.3)) s = this.percentEncodeSome(s);
 
     return s;
   }
@@ -574,8 +574,8 @@ export class URLFuzzer {
     if (s.length < 2) return encodeURIComponent(s);
 
     const chars = s.split('');
-    const encodeCount = this.intBetween(1, Math.min(3, chars.length));
-    for (let i = 0; i < encodeCount; i++) {
+    const encode_count = this.intBetween(1, Math.min(3, chars.length));
+    for (let i = 0; i < encode_count; i++) {
       const idx = this.intBetween(0, chars.length - 1);
       const c = chars[idx];
       if (/[a-z0-9]/i.test(c) && this.prob(0.7)) continue;
@@ -590,9 +590,9 @@ export class URLFuzzer {
   }
 
   private pickComplexity(): number {
-    // Bias the distribution toward 0 or 1 based on complexityBias
+    // Bias the distribution toward 0 or 1 based on complexity_bias
     const r = this.rng();
-    const bias = this.complexityBias;
+    const bias = this.complexity_bias;
 
     // Simple skew curve: bias > 0.5 => skew toward 1; bias < 0.5 => toward 0.
     const k = bias >= 0.5 ? 1 / (1.0001 - (bias - 0.5)) : 1 + (0.5 - bias) * 3;
@@ -615,18 +615,18 @@ export class URLFuzzer {
     items: Array<{ v: T; w: number }>,
     complexity: number
   ): T {
-    const strength = this.complexityWeightingStrength;
+    const strength = this.complexity_weighting_strength;
 
-    // complexityFactor in [-1, +1]
-    const complexityFactor = (complexity - 0.5) * 2;
+    // complexity_factor in [-1, +1]
+    const complexity_factor = (complexity - 0.5) * 2;
 
     // Adjust weights using item position as a proxy for "complexity level".
-    // posFactor in [-1, +1] (earlier => -1, later => +1)
+    // pos_factor in [-1, +1] (earlier => -1, later => +1)
     const n = items.length;
     const adjusted = items.map((it, idx) => {
-      const posFactor = n <= 1 ? 0 : (idx / (n - 1)) * 2 - 1;
+      const pos_factor = n <= 1 ? 0 : (idx / (n - 1)) * 2 - 1;
       // shift multiplier in [~(1-strength), ~(1+strength)] depending on alignment
-      const multiplier = 1 + strength * complexityFactor * posFactor;
+      const multiplier = 1 + strength * complexity_factor * pos_factor;
       // keep weights positive and avoid collapse
       const w = Math.max(1e-9, it.w * multiplier);
       return { v: it.v, w };
@@ -678,6 +678,6 @@ export class URLFuzzer {
 }
 
 // Example usage:
-// const fuzzer = new URLFuzzer({ seed: 1234, complexityBias: 0.75, includeTrickyValidCases: true });
+// const fuzzer = new URLFuzzer({ seed: 1234, complexity_bias: 0.75, include_tricky_valid_cases: true });
 // console.log(fuzzer.genParsableURLs(10));
 // console.log(fuzzer.genUnparsableURLs(10));
