@@ -4,32 +4,18 @@
  * Design correction:
  * - The `complexity` scalar (0..1) now *consistently* influences generation decisions.
  * - `weightedPick(...)` now uses `complexity` to bias selection toward later (more complex) options.
- * - Previously “complexity was threaded but unused” at certain decision points; that is now fixed.
  *
  * Contract:
  * - genParsableURLs: always parse via `new URL(url)` (Node.js WHATWG URL)
  * - genUnparsableURLs: intended to throw in `new URL(url)` (no base URL)
  */
 
-type url_generation_options_t = {
-  seed?: number;
+import type { url_generation_options_t } from '@src/index';
 
-  /**
-   * 0..1: controls typical complexity distribution for parsable URLs.
-   * - 0 => mostly simple
-   * - 1 => mostly complex
-   */
-  complexity_bias?: number;
-
-  include_tricky_valid_cases?: boolean;
-
-  /**
-   * Strength of complexity bias within weightedPick.
-   * 0 => weightedPick ignores complexity (but other logic still uses it)
-   * 1 => strong push toward later options as complexity grows
-   */
-  complexity_weighting_strength?: number;
-};
+// Example usage:
+// const fuzzer = new URLFuzzer({ seed: 1234, complexity_bias: 0.75, include_tricky_valid_cases: true });
+// console.log(fuzzer.genParsableURLs(10));
+// console.log(fuzzer.genUnparsableURLs(10));
 
 export class URLFuzzer {
   private rng: () => number;
@@ -676,8 +662,3 @@ export class URLFuzzer {
     };
   }
 }
-
-// Example usage:
-// const fuzzer = new URLFuzzer({ seed: 1234, complexity_bias: 0.75, include_tricky_valid_cases: true });
-// console.log(fuzzer.genParsableURLs(10));
-// console.log(fuzzer.genUnparsableURLs(10));

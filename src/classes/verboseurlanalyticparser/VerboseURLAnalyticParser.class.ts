@@ -18,7 +18,7 @@ type node_url_error_t = {
 export type url_diagnostic_result_t =
   | {
       ok: true;
-      url: URL;
+      url: string;
       normalized: string;
       issues: url_diagnostic_issue_t[];
     }
@@ -631,7 +631,7 @@ export class VerboseURLAnalyticParser {
         : new URL(original_input);
       return {
         ok: true,
-        url,
+        url: url.href,
         normalized: url.toString(),
         issues: parser_context_t.issues
       };

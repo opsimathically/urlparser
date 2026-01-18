@@ -8,9 +8,9 @@ import { URLFuzzer } from '@src/index';
 
 test('Test parsable/unparsable url generation in url fuzzer.', async function () {
   const url_fuzzer = new URLFuzzer({
-    complexityBias: 1,
-    complexityWeightingStrength: 1,
-    includeTrickyValidCases: true
+    complexity_bias: 1,
+    complexity_weighting_strength: 1,
+    include_tricky_valid_cases: true
   });
 
   // generate parsable/unparsable urls

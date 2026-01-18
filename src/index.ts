@@ -1,5 +1,11 @@
-import { URLFuzzer } from './classes/urlfuzzer/URLFuzzer.class';
-import { URLParser } from './classes/urlparser/URLParser.class';
-import { VerboseURLAnalyticParser } from './classes/verboseurlanalyticparser/VerboseURLAnalyticParser.class';
+// export project types
+export type * from './types/custom_zod_types/custom_zod_types';
+export type * from './types/project_types';
 
-export { URLFuzzer, URLParser, VerboseURLAnalyticParser };
+// export generated validators
+export * from './zod_type_validators/custom_ts_to_zod_generated_validators';
+
+// export classes
+export { URLFuzzer } from './classes/urlfuzzer/URLFuzzer.class';
+export { URLParser } from './classes/urlparser/URLParser.class';
+export { VerboseURLAnalyticParser } from './classes/verboseurlanalyticparser/VerboseURLAnalyticParser.class';
