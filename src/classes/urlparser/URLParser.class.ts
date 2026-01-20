@@ -20,7 +20,7 @@ import type {
 import { isEmpty } from '../../functions/emptyvals/emptyvals';
 import { VerboseURLAnalyticParser } from '../verboseurlanalyticparser/VerboseURLAnalyticParser.class';
 import { parseDomain } from 'parse-domain';
-// import type { ParseResult as parsed_domain_info_t } from 'parse-domain';
+import type { ParseResult as parsed_domain_info_t } from 'parse-domain';
 // import type { url_diagnostic_result_t } from '../verboseurlanalyticparser/VerboseURLAnalyticParser.class';
 
 const stringEndsWith = function (str: string, ends_with: string): boolean {
@@ -65,7 +65,7 @@ function extractNonAlphanumericStrings(input: string): string[] | null {
 
 function extractUniqueCharacters(input: string): string[] {
   const seen = new Set<string>();
-  const result: string[] = [];
+  let result: string[] = [];
 
   for (const char of input) {
     if (!seen.has(char)) {
@@ -73,7 +73,7 @@ function extractUniqueCharacters(input: string): string[] {
       result.push(char);
     }
   }
-
+  if (result.length) result = result.toSorted();
   return result;
 }
 
@@ -172,6 +172,7 @@ export class URLParser {
     // user_and_password_info
 
     final_urlparse_data.base_info = urlparser_ref.parseBaseInfo({
+      original_url_string: url_to_parse,
       url: parsed_url,
       parse_data: final_urlparse_data
     });
@@ -303,10 +304,8 @@ export class URLParser {
     return port_and_proto_info;
   }
 
-  /**
-   * @description Parses the base part of a url into useful data.
-   */
   private parseBaseInfo(params: {
+    original_url_string: string;
     url: URL;
     parse_data: urlparsed_t;
   }): urlparse_base_info_t {
@@ -323,11 +322,21 @@ export class URLParser {
 
     // create base uri
     if (isEmpty(url.pathname) === true) {
-      url_base = url.href;
+      url_base = params.original_url_string;
     } else {
-      url_base = url.href.slice(0, url.href.indexOf(url.pathname));
+      // Don't use this:
+      // url_base = url.href.slice(0, url.href.indexOf(url.pathname));
+      // Why: We use the original url string instead of url.href here due to the
+      // native node URL parser automatically converting the host part to lowercase. For
+      // the sake of accuracy, we want the actual url base rather than the lowercase
+      // version only.
+      url_base = params.original_url_string.slice(
+        0,
+        params.original_url_string.indexOf(url.pathname)
+      );
     }
-    if (url_base) parse_data.indicators.has_url_base = true;
+
+    // original_url_string
 
     base_info.base = url_base;
     base_info.base_lowercase = url_base.toLowerCase();
@@ -350,8 +359,6 @@ export class URLParser {
           base_info.base_without_port.toLowerCase();
       }
     }
-
-    //
 
     return base_info;
   }
@@ -516,10 +523,11 @@ export class URLParser {
           ? parsed_path.path.toSorted()
           : parsed_path.path;
 
-      if (parsed_path.path_str)
+      if (parsed_path.path_str) {
         parsed_path.path_str_unique_chars = extractUniqueCharacters(
           parsed_path.path_str
         );
+      }
 
       // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
       // %%% Parse Resource/Details %%%%%%%%%%%%%%%%%%%%%%%%%%

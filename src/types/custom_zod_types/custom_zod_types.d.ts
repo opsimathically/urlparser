@@ -12,6 +12,29 @@
 
 export type parsed_domain_info_t = unknown;
 
+type parse_domain_validation_error = {
+  type: string;
+  message: string;
+  column: number;
+};
+
+type parse_result_listed_domains_t = {
+  subDomains: Array<string>;
+  domain: string | undefined;
+  topLevelDomains: Array<string>;
+};
+
+export type parse_domain_result_t = {
+  type: 'INVALID' | 'IP' | 'RESERVED' | 'NOT_LISTED' | 'LISTED';
+  hostname: string;
+  errors: Array<parse_domain_validation_error>;
+  labels: Array<string>;
+  subDomains: Array<string>;
+  domain: string | undefined;
+  topLevelDomains: Array<string>;
+  icann: parse_result_listed_domains_t;
+};
+
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%% URLFuzzer Class %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
