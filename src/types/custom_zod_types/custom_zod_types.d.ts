@@ -10,7 +10,7 @@
 // forced to cast this type as an opaque unknown.  In real use
 // cases,
 
-export type parsed_domain_info_t = unknown;
+// export type parsed_domain_info_t = unknown;
 
 type parse_domain_validation_error = {
   type: string;
@@ -24,11 +24,11 @@ export type urlparsed_domain_result_t = {
   errors: Array<parse_domain_validation_error>;
   labels: Array<string>;
   subdomains: Array<string>;
-  domain: string | undefined;
+  domain: string;
   top_level_domains: Array<string>;
   icann: {
     subdomains: Array<string>;
-    domain: string | undefined;
+    domain: string;
     top_level_domains: Array<string>;
   };
 };
