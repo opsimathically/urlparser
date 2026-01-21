@@ -25,7 +25,7 @@ test('Test url parser utilizing parsable/unparsable urls generated via fuzzer.',
 
   // test extractions
   const extraction_test_1 =
-    'https://hey:ThEre@somethingTEST.com:8842/path1234blah/56hello-there78/////---910---///56HELLO-tHEre78/mOO.PhP?blah!=BLAH1&blAh2=blah3';
+    'https://hey:ThEre@something.someTHING.blah.TEST.co.uk:8842/path1234blah/56hello-there78/////---910---///56HELLO-tHEre78/mOO.PhP?blah!=BLAH1&blAh2=blah3';
   const extraction_test_result_1 = urlparser.parse(extraction_test_1);
   debugger;
 

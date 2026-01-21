@@ -5,6 +5,7 @@ import type {
   urlparse_base_info_t,
   urlparsed_baseinfo_t,
   urlparsed_resource_t,
+  urlparsed_domain_result_t,
   urlparsed_resource_details_t,
   urlparsed_path_component_t,
   urlparsed_path_element_details_t,
@@ -212,9 +213,67 @@ export class URLParser {
     host_info.host_with_protocol_lowercase =
       host_info.host_with_protocol.toLowerCase();
 
-    host_info.host_domain_information_parsed = parseDomain(
-      host_info.host_lowercase
-    );
+    // create a dummy object which will hold assignments from the
+    // parse-domain library.
+    const urlparsed_domain: urlparsed_domain_result_t = {
+      type: 'INVALID',
+      hostname: 'INVALID',
+      errors: [],
+      labels: [],
+      subdomains: [],
+      domain: 'INVALID',
+      top_level_domains: [],
+      icann: {
+        subdomains: [],
+        domain: 'INVALID',
+        top_level_domains: []
+      }
+    };
+    // host_info.host_domain_information_parsed
+
+    // Note: we type to 'any' here so we can assign to our internal type.  This is
+    // done so zod validators can work as desired.  We don't just do an Object.assign
+    // because we want all properties on the object to be set for later database insertion.
+    const parsed_domain = parseDomain(host_info.host_lowercase) as any;
+    if (parsed_domain) {
+      if (parsed_domain.type) {
+        urlparsed_domain.type = parsed_domain.type;
+      }
+      if (parsed_domain.hostname) {
+        urlparsed_domain.hostname = parsed_domain.hostname;
+      }
+      if (parsed_domain.errors) {
+        urlparsed_domain.errors = parsed_domain.errors;
+      }
+      if (parsed_domain.labels) {
+        urlparsed_domain.labels = parsed_domain.labels;
+      }
+      if (parsed_domain.subDomains) {
+        urlparsed_domain.subdomains = parsed_domain.subDomains;
+      }
+      if (parsed_domain.domain) {
+        urlparsed_domain.domain = parsed_domain.domain;
+      }
+      if (parsed_domain.topLevelDomains) {
+        urlparsed_domain.top_level_domains = parsed_domain.topLevelDomains;
+      }
+      if (parsed_domain.icann.subDomains) {
+        urlparsed_domain.icann.subdomains = parsed_domain.icann.subDomains;
+      }
+      if (parsed_domain.icann.domain) {
+        urlparsed_domain.icann.domain = parsed_domain.icann.domain;
+      }
+      if (parsed_domain.icann.topLevelDomains) {
+        urlparsed_domain.icann.top_level_domains =
+          parsed_domain.icann.topLevelDomains;
+      }
+    }
+
+    // only set parse result if we have one
+    if (parsed_domain) {
+      host_info.host_domain_information_parsed = urlparsed_domain;
+    }
+    debugger;
 
     return host_info;
   }

@@ -18,21 +18,19 @@ type parse_domain_validation_error = {
   column: number;
 };
 
-type parse_result_listed_domains_t = {
-  subDomains: Array<string>;
-  domain: string | undefined;
-  topLevelDomains: Array<string>;
-};
-
-export type parse_domain_result_t = {
+export type urlparsed_domain_result_t = {
   type: 'INVALID' | 'IP' | 'RESERVED' | 'NOT_LISTED' | 'LISTED';
   hostname: string;
   errors: Array<parse_domain_validation_error>;
   labels: Array<string>;
-  subDomains: Array<string>;
+  subdomains: Array<string>;
   domain: string | undefined;
-  topLevelDomains: Array<string>;
-  icann: parse_result_listed_domains_t;
+  top_level_domains: Array<string>;
+  icann: {
+    subdomains: Array<string>;
+    domain: string | undefined;
+    top_level_domains: Array<string>;
+  };
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -146,7 +144,7 @@ export type urlparse_host_info_t = {
   host_with_protocol: string;
   host_lowercase: string;
   host_with_protocol_lowercase: string;
-  host_domain_information_parsed: parsed_domain_info_t | null;
+  host_domain_information_parsed: urlparsed_domain_result_t | null;
 };
 
 export type urlparse_base_info_t = {
