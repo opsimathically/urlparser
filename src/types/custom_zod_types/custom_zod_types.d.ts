@@ -144,6 +144,11 @@ export type urlparse_host_info_t = {
   host_with_protocol: string;
   host_lowercase: string;
   host_with_protocol_lowercase: string;
+  domain: string | null;
+  domain_with_tld: string | null;
+  domain_with_subdomains_and_tld: string | null;
+  top_level_domain: string | null;
+  subdomains: string | null;
   host_domain_information_parsed: urlparsed_domain_result_t | null;
 };
 
@@ -152,16 +157,6 @@ export type urlparse_base_info_t = {
   base_lowercase: string;
   base_without_port: string;
   base_without_port_lowercase: string;
-};
-
-export type urlparsed_baseinfo_t = {
-  base: string;
-  base_with_port: string;
-};
-
-export type urlparsed_resource_t = {
-  name: string | null;
-  extension: string | null;
 };
 
 export type urlparsed_path_charsets_t = {
@@ -273,13 +268,9 @@ export type urlparsed_indicators_t = {
   has_numeric_path?: boolean;
   has_numeric_parameters?: boolean;
   has_numeric_parameter_names?: boolean;
-  has_script_filename_extension?: boolean;
+  has_resource_filename_extension?: boolean;
   is_protocol_standard_port?: boolean;
   has_invalid_tcp_port?: boolean;
-};
-
-export type urlparse_fail_indicators_t = {
-  url_failed_basic_parse: boolean;
 };
 
 export interface urlparsed_queryparam_t {
@@ -322,13 +313,138 @@ export type urlparsed_param_info_t = {
   params_as_array: urlparsed_queryparam_t[];
 };
 
+export type url_hash_data_t = {
+  hash: string | null;
+  hash_lowercase: string | null;
+};
+
+export type unusual_url_type_t =
+  | 'unknown_type'
+  | 'data_url_type'
+  | 'blob_url_type'
+  | 'about_url_type'
+  | 'mailto_url_type'
+  | 'telephone_url_type'
+  | 'urn_url_type'
+  | 'unknown_type';
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Data URLs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+export type data_url_info_t = {
+  scheme: 'data';
+  media_type: string; // e.g. "text/plain", "image/png"
+  charset: string | null; // e.g. "utf-8"
+  is_base64: boolean; // true if ";base64" present
+  data: string; // everything after the first comma (not decoded)
+  metadata: string; // everything between "data:" and the comma (raw, not decoded)
+};
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Blob URLs %%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+export type blob_url_info_t = {
+  scheme: 'blob';
+  origin: string; // e.g. "https://example.com", "null", "chrome-extension://abc123"
+  uuid: string; // typically a UUID, but returned as-is
+  query: string | null; // without leading "?"
+  fragment: string | null; // without leading "#"
+  raw: string; // trimmed original input
+};
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% About URLs %%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+export type about_url_info_t = {
+  scheme: 'about';
+  identifier: string; // main page token (may be empty)
+  query: string | null; // without leading "?"
+  fragment: string | null; // without leading "#"
+  raw: string; // trimmed original input
+};
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Mailto URLs %%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+export type mailto_url_info_t = {
+  scheme: 'mailto';
+  raw: string; // trimmed original input
+  to: string[]; // recipients from the mailto path (raw, not decoded)
+  cc: string[]; // recipients from cc query params (split on , and ;)
+  bcc: string[]; // recipients from bcc query params (split on , and ;)
+  subject: string[]; // all subject values (raw, not decoded) - repeated keys preserved
+  body: string[]; // all body values (raw, not decoded) - repeated keys preserved
+  other_query_params: Record<string, string[]>; // any other query params, repeated keys preserved
+  fragment: string | null; // content after '#', if present (raw, not decoded)
+};
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Telephone URLs %%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+export type tel_url_info_t = {
+  scheme: 'tel';
+  phone_number: string; // raw phone portion (no params)
+  parameters: Record<string, string[]>; // semicolon params (raw, repeated keys preserved)
+  raw: string; // trimmed original input
+};
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Uniform Resource Name URLs %%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+export type urn_url_info_t = {
+  scheme: 'urn';
+  nid: string; // namespace identifier (raw)
+  nss: string; // namespace-specific string (raw; may contain colons)
+  query: string | null; // without leading "?"
+  fragment: string | null; // without leading "#"
+  raw: string; // trimmed original input
+};
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% URL Parsed Type %%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 export type urlparsed_t = {
+  type:
+    | 'websocket'
+    | 'web'
+    | 'email'
+    | 'service'
+    | 'data'
+    | 'blob'
+    | 'about'
+    | 'mailto'
+    | 'telephone'
+    | 'urn'
+    | 'other'
+    | 'unset';
+
+  // if it's a data: url
+  data_url_info?: data_url_info_t | null;
+  // if it's a blob url
+  blob_url_info?: blob_url_info_t | null;
+  // if it's a about url
+  about_url_info?: about_url_info_t | null;
+  // if it's a mailto url
+  mailto_url_info?: mailto_url_info_t | null;
+  // if it's a tel url
+  tel_url_info?: tel_url_info_t | null;
+  // if it's a tel url
+  urn_url_info?: urn_url_info_t | null;
+
   scheme_and_port_info?: urlparse_port_and_protocol_info_t | null;
   user_and_password_info?: urlparse_user_and_password_info_t | null;
   host_info?: urlparse_host_info_t | null;
   base_info?: urlparse_base_info_t | null;
   path_and_resource_info?: urlparsed_path_and_resource_info_t | null;
   parameter_info?: urlparsed_param_info_t | null;
+  hash_info?: url_hash_data_t | null;
   failed_parse_diagnostics?: url_diagnostic_result_t | null;
-  indicators: urlparsed_indicators_t;
+  indicators?: any;
 };

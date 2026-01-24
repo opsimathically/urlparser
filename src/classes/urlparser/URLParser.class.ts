@@ -3,80 +3,38 @@ import type {
   urlparse_port_and_protocol_info_t,
   urlparse_host_info_t,
   urlparse_base_info_t,
-  urlparsed_baseinfo_t,
-  urlparsed_resource_t,
   urlparsed_domain_result_t,
   urlparsed_resource_details_t,
   urlparsed_path_component_t,
   urlparsed_path_element_details_t,
   urlparsed_path_and_resource_info_t,
   urlparsed_indicators_t,
-  urlparse_fail_indicators_t,
   urlparsed_path_t,
   urlparsed_queryparam_t,
   urlparsed_param_info_t,
+  url_hash_data_t,
+  unusual_url_type_t,
+  data_url_info_t,
+  blob_url_info_t,
+  about_url_info_t,
+  mailto_url_info_t,
+  tel_url_info_t,
+  urn_url_info_t,
   urlparsed_t
 } from '@src/index';
 
 import { isEmpty } from '../../functions/emptyvals/emptyvals';
 import { VerboseURLAnalyticParser } from '../verboseurlanalyticparser/VerboseURLAnalyticParser.class';
 import { parseDomain } from 'parse-domain';
-import type { ParseResult as parsed_domain_info_t } from 'parse-domain';
-// import type { url_diagnostic_result_t } from '../verboseurlanalyticparser/VerboseURLAnalyticParser.class';
 
-const stringEndsWith = function (str: string, ends_with: string): boolean {
-  if (str.substring(str.length - ends_with.length) == ends_with) return true;
-  return false;
-};
-
-function extractNumericStrings(input: string): string[] | null {
-  if (!input) return null;
-  const matches: RegExpMatchArray | null = input.match(/\d+/g);
-  return matches ? matches : null;
-}
-
-function extractNonNumericStrings(input: string): string[] | null {
-  const parts: string[] = input.split(/\d+/).filter((part) => part.length > 0);
-  return parts.length > 0 ? parts : null;
-}
-
-function extractNonNumericStringsLowercase(input: string): string[] | null {
-  const parts: string[] = input
-    .split(/\d+/)
-    .map((part) => part.toLowerCase())
-    .filter((part) => part.length > 0);
-
-  return parts.length > 0 ? parts : null;
-}
-
-function extractAlphabeticStrings(input: string): string[] | null {
-  const matches: RegExpMatchArray | null = input.match(/[A-Za-z]+/g);
-  return matches ? matches : null;
-}
-
-function extractAlphabeticStringsLowercase(input: string): string[] | null {
-  const matches: RegExpMatchArray | null = input.match(/[A-Za-z]+/g);
-  return matches ? matches.map((part) => part.toLowerCase()) : null;
-}
-
-function extractNonAlphanumericStrings(input: string): string[] | null {
-  const matches: RegExpMatchArray | null = input.match(/[^A-Za-z0-9]+/g);
-  return matches ? matches : null;
-}
-
-function extractUniqueCharacters(input: string): string[] {
-  const seen = new Set<string>();
-  let result: string[] = [];
-
-  for (const char of input) {
-    if (!seen.has(char)) {
-      seen.add(char);
-      result.push(char);
-    }
-  }
-  if (result.length) result = result.toSorted();
-  return result;
-}
+import {
+  extractNumericStrings,
+  extractNonNumericStrings,
+  extractAlphabeticStrings,
+  // extractAlphabeticStringsLowercase,
+  extractNonAlphanumericStrings,
+  extractUniqueCharacters
+} from '../../functions/extractors/extractors';
 
 export const urlparser_tcp_ports_by_scheme: Record<string, number> = {
   http: 80,
@@ -110,19 +68,60 @@ export const urlparser_tcp_ports_by_scheme: Record<string, number> = {
   'xmpp-server': 5269
 };
 
+function detectUnusualUrlType(input_url: string): unusual_url_type_t {
+  if (typeof input_url !== 'string') {
+    return 'unknown_type';
+  }
+
+  const normalized_url = input_url.trim().toLowerCase();
+
+  if (normalized_url.startsWith('data:')) {
+    return 'data_url_type';
+  }
+
+  if (normalized_url.startsWith('blob:')) {
+    return 'blob_url_type';
+  }
+
+  if (normalized_url.startsWith('about:')) {
+    return 'about_url_type';
+  }
+
+  if (normalized_url.startsWith('mailto:')) {
+    return 'mailto_url_type';
+  }
+
+  if (normalized_url.startsWith('tel:')) {
+    return 'telephone_url_type';
+  }
+
+  if (normalized_url.startsWith('urn:')) {
+    return 'urn_url_type';
+  }
+
+  return 'unknown_type';
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% URL Parser %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 export class URLParser {
   private verbose_analytic_parser: VerboseURLAnalyticParser =
     new VerboseURLAnalyticParser();
   constructor() {}
 
-  public parse(url_to_parse: string): urlparsed_t {
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% Main Parse URL %%%%%%%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  public parse(url_to_parse: string): urlparsed_t | null {
     // set self ref
     const urlparser_ref = this;
 
     const final_urlparse_data: urlparsed_t = {
-      indicators: {
-        failures: {}
-      }
+      type: 'unset',
+      indicators: {}
     };
 
     // 1) Use built in URL parser to parse.
@@ -133,9 +132,6 @@ export class URLParser {
       parsed_url = new URL(url_to_parse, url_to_parse);
     } catch (err: any) {
       if (err) {
-        final_urlparse_data.indicators.has_failures = true;
-        final_urlparse_data.indicators.failures.failed_basic_parsing = true;
-
         // create diagnostics
         final_urlparse_data.failed_parse_diagnostics =
           urlparser_ref.verbose_analytic_parser.analyzeUrl(
@@ -146,11 +142,82 @@ export class URLParser {
         return final_urlparse_data;
       }
     }
-    if (!parsed_url) {
+
+    if (!parsed_url || parsed_url?.hostname === '') {
+      // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      // %%% Attempt To Parse Unusual Types %%%%%
+      // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+      const detected_unusual_type = detectUnusualUrlType(
+        url_to_parse.toLowerCase()
+      );
+      switch (detected_unusual_type) {
+        // parse as a data url
+        case 'data_url_type':
+          final_urlparse_data.type = 'data';
+          final_urlparse_data.data_url_info =
+            urlparser_ref.parseDataURL(url_to_parse);
+          if (!final_urlparse_data.data_url_info) return null;
+          return final_urlparse_data;
+
+        // parse as a blob url
+        case 'blob_url_type':
+          final_urlparse_data.type = 'blob';
+          final_urlparse_data.blob_url_info =
+            urlparser_ref.parseBlobURL(url_to_parse);
+          if (!final_urlparse_data.blob_url_info) return null;
+          return final_urlparse_data;
+
+        case 'about_url_type':
+          final_urlparse_data.type = 'about';
+          final_urlparse_data.about_url_info =
+            urlparser_ref.parseAboutURL(url_to_parse);
+          if (!final_urlparse_data.about_url_info) return null;
+          return final_urlparse_data;
+
+        case 'mailto_url_type':
+          final_urlparse_data.type = 'mailto';
+          final_urlparse_data.mailto_url_info =
+            urlparser_ref.parseMailtoURL(url_to_parse);
+          if (!final_urlparse_data.mailto_url_info) return null;
+          return final_urlparse_data;
+
+        case 'telephone_url_type':
+          final_urlparse_data.type = 'telephone';
+          final_urlparse_data.tel_url_info =
+            urlparser_ref.parseTelephoneURL(url_to_parse);
+          if (!final_urlparse_data.tel_url_info) return null;
+          return final_urlparse_data;
+
+        case 'urn_url_type':
+          final_urlparse_data.type = 'urn';
+          final_urlparse_data.urn_url_info =
+            urlparser_ref.parseURNURL(url_to_parse);
+          if (!final_urlparse_data.urn_url_info) return null;
+          return final_urlparse_data;
+
+        // unknown types return null
+        case 'unknown_type':
+        default:
+          break;
+      }
+
+      // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      // %%% Fail If Wasn't Unusual Type %%%%%%%%
+      // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
       final_urlparse_data.indicators.has_failures = true;
-      final_urlparse_data.indicators.failures.failed_basic_parsing = true;
       return final_urlparse_data;
     }
+
+    // things like mailto: will give a parsed_url, but won't have a hostname
+    // if we got this far we know we got problems
+    if (parsed_url.hostname === '') return null;
+
+    if (url_to_parse.toLowerCase().indexOf('mailto') === 0) debugger;
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Parse Typical URLs %%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     //
     final_urlparse_data.scheme_and_port_info =
@@ -170,8 +237,6 @@ export class URLParser {
       parse_data: final_urlparse_data
     });
 
-    // user_and_password_info
-
     final_urlparse_data.base_info = urlparser_ref.parseBaseInfo({
       original_url_string: url_to_parse,
       url: parsed_url,
@@ -189,7 +254,530 @@ export class URLParser {
       parse_data: final_urlparse_data
     });
 
+    final_urlparse_data.hash_info = urlparser_ref.parseURLHashData({
+      url: parsed_url,
+      parse_data: final_urlparse_data
+    });
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Process and Set Indicators %%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    // Indicators are used to provide simple flags which can be searched for
+    // in database queries.  The point is to reduce query complexity, reduce
+    // pipeline requirements, and simply do some work in advance so that later
+    // data lookups are more natural and less investigatory.
+    final_urlparse_data.indicators =
+      urlparser_ref.processParseDataAndSetIndicators({
+        parse_data: final_urlparse_data
+      });
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Process and Calculate Hashes %%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    // Hash Sets are used for quick lookups of potential data.  If you're looking
+    // for a URL in the database that contains exact data in an exact position, a hash
+    // lookup is often an easier/faster solution than a complex query.
+
+    debugger;
     return final_urlparse_data;
+  }
+
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% Internal Private Methods %%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% Data URL Parsing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  parseDataURL(input_url: string): data_url_info_t | null {
+    if (typeof input_url !== 'string') return null;
+
+    const trimmed_url = input_url.trim();
+
+    // Scheme check (case-insensitive) without attempting full URL parsing
+    if (
+      trimmed_url.length < 5 ||
+      trimmed_url.slice(0, 5).toLowerCase() !== 'data:'
+    ) {
+      return null;
+    }
+
+    // RFC2397: data:[<mediatype>][;base64],<data>
+    // The first comma separates metadata from data payload.
+    const comma_index = trimmed_url.indexOf(',');
+    if (comma_index === -1) {
+      return null; // not a valid data URL (must have comma delimiter)
+    }
+
+    const metadata = trimmed_url.slice(5, comma_index); // after "data:" up to comma
+    const data = trimmed_url.slice(comma_index + 1); // after comma to end
+
+    // Defaults per RFC2397 if mediatype is omitted
+    let media_type = 'text/plain';
+    let charset: string | null = 'US-ASCII';
+    let is_base64 = false;
+
+    // Empty metadata means default mediatype/charset, no base64
+    if (metadata.length > 0) {
+      const metadata_parts = metadata.split(';');
+
+      // If the first part contains "/" it's a mediatype; otherwise mediatype is omitted.
+      const first_part = metadata_parts[0];
+      let start_index = 0;
+
+      if (first_part.includes('/')) {
+        media_type = first_part.toLowerCase();
+        charset = null; // charset only set if explicitly provided when mediatype is present
+        start_index = 1;
+      } else {
+        // mediatype omitted: keep defaults (text/plain; US-ASCII) unless overridden by charset
+        start_index = 0;
+      }
+
+      for (let i = start_index; i < metadata_parts.length; i++) {
+        const part = metadata_parts[i].trim();
+        if (!part) continue;
+
+        if (part.toLowerCase() === 'base64') {
+          is_base64 = true;
+          continue;
+        }
+
+        // charset=...
+        if (part.toLowerCase().startsWith('charset=')) {
+          const charset_value = part.slice('charset='.length).trim();
+          charset = charset_value.length > 0 ? charset_value : null;
+          continue;
+        }
+
+        // Other parameters exist in the wild; ignore them but keep parser resilient.
+      }
+
+      // If mediatype was present but charset was never specified, leave as null
+      // (caller can interpret null as "unspecified").
+      // If mediatype was omitted, charset default remains US-ASCII unless overridden.
+    }
+
+    return {
+      scheme: 'data',
+      media_type: media_type,
+      charset: charset,
+      is_base64: is_base64,
+      data: data,
+      metadata: metadata
+    };
+  }
+
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% Blob URLs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  parseBlobURL(input_url: string): blob_url_info_t | null {
+    if (typeof input_url !== 'string') return null;
+
+    const raw = input_url.trim();
+    if (raw.length < 5) return null;
+
+    // Case-insensitive scheme check
+    if (raw.slice(0, 5).toLowerCase() !== 'blob:') return null;
+
+    const remainder = raw.slice(5); // everything after "blob:"
+    if (remainder.length === 0) return null;
+
+    // Separate off fragment and query from the remainder (do not decode)
+    let main_part = remainder;
+    let fragment: string | null = null;
+    let query: string | null = null;
+
+    const hash_index = main_part.indexOf('#');
+    if (hash_index !== -1) {
+      fragment = main_part.slice(hash_index + 1);
+      main_part = main_part.slice(0, hash_index);
+    }
+
+    const question_index = main_part.indexOf('?');
+    if (question_index !== -1) {
+      query = main_part.slice(question_index + 1);
+      main_part = main_part.slice(0, question_index);
+    }
+
+    // Expected high-level shape: <origin>/<uuid>
+    // Use *last* "/" to be resilient if origin ever contains "/"
+    const last_slash_index = main_part.lastIndexOf('/');
+    if (last_slash_index === -1) return null;
+
+    const origin = main_part.slice(0, last_slash_index);
+    const uuid = main_part.slice(last_slash_index + 1);
+
+    if (origin.length === 0 || uuid.length === 0) return null;
+
+    return {
+      scheme: 'blob',
+      origin: origin,
+      uuid: uuid,
+      query: query,
+      fragment: fragment,
+      raw: raw
+    };
+  }
+
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% About URL Parsing %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  parseAboutURL(input_url: string): about_url_info_t | null {
+    if (typeof input_url !== 'string') return null;
+
+    const raw = input_url.trim();
+    if (raw.length < 6) return null;
+
+    // Case-insensitive scheme check
+    if (raw.slice(0, 6).toLowerCase() !== 'about:') {
+      return null;
+    }
+
+    let remainder = raw.slice(6); // everything after "about:"
+    let fragment: string | null = null;
+    let query: string | null = null;
+
+    // Extract fragment first
+    const hash_index = remainder.indexOf('#');
+    if (hash_index !== -1) {
+      fragment = remainder.slice(hash_index + 1);
+      remainder = remainder.slice(0, hash_index);
+    }
+
+    // Extract query
+    const question_index = remainder.indexOf('?');
+    if (question_index !== -1) {
+      query = remainder.slice(question_index + 1);
+      remainder = remainder.slice(0, question_index);
+    }
+
+    // What remains is the identifier (may be empty)
+    const identifier = remainder;
+
+    return {
+      scheme: 'about',
+      identifier: identifier,
+      query: query,
+      fragment: fragment,
+      raw: raw
+    };
+  }
+
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% Mailto URLs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  parseMailtoURL(input_url: string): mailto_url_info_t | null {
+    if (typeof input_url !== 'string') return null;
+
+    const raw = input_url.trim();
+    if (raw.length < 7) return null;
+
+    // Case-insensitive scheme check
+    if (raw.slice(0, 7).toLowerCase() !== 'mailto:') return null;
+
+    // Split off fragment first (common in copied URLs, even if not semantically meaningful for mailto)
+    const hash_index = raw.indexOf('#');
+    const raw_without_fragment =
+      hash_index === -1 ? raw : raw.slice(0, hash_index);
+    const fragment = hash_index === -1 ? null : raw.slice(hash_index + 1);
+
+    const remainder = raw_without_fragment.slice(7); // everything after "mailto:"
+
+    // Split once on "?" to separate recipients from query
+    const question_index = remainder.indexOf('?');
+    const to_part =
+      question_index === -1 ? remainder : remainder.slice(0, question_index);
+    const query_part =
+      question_index === -1 ? '' : remainder.slice(question_index + 1);
+
+    // Recipients in the path: RFC-style comma-separated; semicolons appear in practice.
+    // Keep raw tokens; drop empties.
+    const to = to_part
+      .split(/[;,]/g)
+      .map((token) => token.trim())
+      .filter((token) => token.length > 0);
+
+    // Parse query string into multi-map WITHOUT decoding.
+    // We tolerate both "&" and ";" separators between pairs.
+    const raw_query_params: Record<string, string[]> = {};
+
+    if (query_part.length > 0) {
+      const pairs = query_part.split(/[&;]/g);
+
+      for (const pair of pairs) {
+        if (!pair) continue;
+
+        const equals_index = pair.indexOf('=');
+        const raw_key = (
+          equals_index === -1 ? pair : pair.slice(0, equals_index)
+        ).trim();
+        const raw_value =
+          equals_index === -1 ? '' : pair.slice(equals_index + 1);
+
+        // Skip empty keys like "?=value"
+        if (!raw_key) continue;
+
+        if (!raw_query_params[raw_key]) {
+          raw_query_params[raw_key] = [];
+        }
+        raw_query_params[raw_key].push(raw_value);
+      }
+    }
+
+    // Helpers: collect + split address lists from query params like cc/bcc
+    const split_address_list = (values: string[]): string[] => {
+      // Do not decode; just split on commas/semicolons and trim.
+      // Preserve "opaque" tokens like `"Support Team" <support@example.com>` if they appear unencoded.
+      const results: string[] = [];
+
+      for (const value of values) {
+        const tokens = value
+          .split(/[;,]/g)
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0);
+
+        results.push(...tokens);
+      }
+
+      return results;
+    };
+
+    const get_values_case_insensitive = (param_name: string): string[] => {
+      const matches: string[] = [];
+      const target = param_name.toLowerCase();
+
+      for (const key of Object.keys(raw_query_params)) {
+        if (key.toLowerCase() === target) {
+          matches.push(...raw_query_params[key]);
+        }
+      }
+
+      return matches;
+    };
+
+    const cc_values = get_values_case_insensitive('cc');
+    const bcc_values = get_values_case_insensitive('bcc');
+    const subject_values = get_values_case_insensitive('subject');
+    const body_values = get_values_case_insensitive('body');
+
+    const cc = split_address_list(cc_values);
+    const bcc = split_address_list(bcc_values);
+
+    // Everything else goes into other_query_params (excluding cc/bcc/subject/body, case-insensitive)
+    const other_query_params: Record<string, string[]> = {};
+    const excluded_keys = new Set(['cc', 'bcc', 'subject', 'body']);
+
+    for (const key of Object.keys(raw_query_params)) {
+      if (excluded_keys.has(key.toLowerCase())) continue;
+      other_query_params[key] = raw_query_params[key];
+    }
+
+    return {
+      scheme: 'mailto',
+      raw: raw,
+      fragment: fragment,
+      to: to,
+      cc: cc,
+      bcc: bcc,
+      subject: subject_values,
+      body: body_values,
+      other_query_params: other_query_params
+    };
+  }
+
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% Telephone URLs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  parseTelephoneURL(input_url: string): tel_url_info_t | null {
+    if (typeof input_url !== 'string') return null;
+
+    const raw = input_url.trim();
+    if (raw.length < 4) return null;
+
+    // Case-insensitive scheme check
+    if (raw.slice(0, 4).toLowerCase() !== 'tel:') return null;
+
+    let remainder = raw.slice(4); // everything after "tel:"
+
+    // Split off query if present (rare, but tolerated)
+    const question_index = remainder.indexOf('?');
+    if (question_index !== -1) {
+      remainder = remainder.slice(0, question_index);
+    }
+
+    // Split phone number from parameters (semicolon-delimited)
+    const parts = remainder.split(';');
+    const phone_number = parts[0] ?? '';
+
+    const parameters: Record<string, string[]> = {};
+
+    for (let i = 1; i < parts.length; i++) {
+      const part = parts[i].trim();
+      if (!part) continue;
+
+      const equals_index = part.indexOf('=');
+      const key = equals_index === -1 ? part : part.slice(0, equals_index);
+      const value = equals_index === -1 ? '' : part.slice(equals_index + 1);
+
+      if (!parameters[key]) {
+        parameters[key] = [];
+      }
+      parameters[key].push(value);
+    }
+
+    return {
+      scheme: 'tel',
+      phone_number: phone_number,
+      parameters: parameters,
+      raw: raw
+    };
+  }
+
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% Parse URN URLs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  parseURNURL(input_url: string): urn_url_info_t | null {
+    if (typeof input_url !== 'string') return null;
+
+    const raw = input_url.trim();
+    if (raw.length < 4) return null;
+
+    // Case-insensitive scheme check
+    if (raw.slice(0, 4).toLowerCase() !== 'urn:') return null;
+
+    let remainder = raw.slice(4); // everything after "urn:"
+    if (remainder.length === 0) return null;
+
+    // Extract fragment first
+    let fragment: string | null = null;
+    const hash_index = remainder.indexOf('#');
+    if (hash_index !== -1) {
+      fragment = remainder.slice(hash_index + 1);
+      remainder = remainder.slice(0, hash_index);
+    }
+
+    // Extract query
+    let query: string | null = null;
+    const question_index = remainder.indexOf('?');
+    if (question_index !== -1) {
+      query = remainder.slice(question_index + 1);
+      remainder = remainder.slice(0, question_index);
+    }
+
+    // Now remainder should be "<nid>:<nss>" (nss may contain additional colons)
+    const first_colon_index = remainder.indexOf(':');
+    if (first_colon_index === -1) {
+      return null; // no nid/nss separator
+    }
+
+    const nid = remainder.slice(0, first_colon_index);
+    const nss = remainder.slice(first_colon_index + 1);
+
+    if (nid.length === 0 || nss.length === 0) return null;
+
+    return {
+      scheme: 'urn',
+      nid,
+      nss,
+      query,
+      fragment,
+      raw
+    };
+  }
+
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% URL Parsing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  private processParseDataAndSetIndicators(params: {
+    parse_data: urlparsed_t;
+  }): urlparsed_indicators_t {
+    const { parse_data } = params;
+    const indicators: any = {} as any;
+
+    /*
+    export type urlparsed_t = {
+      scheme_and_port_info?: urlparse_port_and_protocol_info_t | null;
+      user_and_password_info?: urlparse_user_and_password_info_t | null;
+      host_info?: urlparse_host_info_t | null;
+      base_info?: urlparse_base_info_t | null;
+      path_and_resource_info?: urlparsed_path_and_resource_info_t | null;
+      parameter_info?: urlparsed_param_info_t | null;
+      hash_info?: url_hash_data_t | null;
+      failed_parse_diagnostics?: url_diagnostic_result_t | null;
+      indicators: any;
+    };
+    */
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Scheme And Port Indicators %%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    if (parse_data.scheme_and_port_info) {
+      const protocol = parse_data.scheme_and_port_info.protocol;
+      const port = parse_data.scheme_and_port_info.port;
+      const protocol_std_port =
+        parse_data.scheme_and_port_info.protocol_std_port;
+
+      /*
+      export type urlparse_port_and_protocol_info_t = {
+        scheme: string;
+        protocol: string;
+        port: number;
+        protocol_std_port: number;
+      };
+      */
+      if (port !== protocol_std_port)
+        indicators.is_nonstandard_protocol_port = true;
+      else indicators.is_standard_protocol_port = true;
+
+      // check websocket
+      if (['ws', 'wss'].includes(protocol)) {
+        indicators.is_websocket = true;
+      }
+
+      // check http/https
+      if (['http', 'https'].includes(protocol)) {
+        indicators.is_webtarget = true;
+      }
+
+      // check if it's not a websocket, or not a http protocol
+      if (!['http', 'https', 'ws', 'wss'].includes(protocol)) {
+        indicators.is_atypical_web_protocol = true;
+      }
+
+      if (protocol === 'file') indicators.is_file_protocol = true;
+    }
+
+    debugger;
+    return indicators;
+  }
+
+  private parseURLHashData(params: {
+    url: URL;
+    parse_data: urlparsed_t;
+  }): url_hash_data_t {
+    const { url /*, parse_data*/ } = params;
+    const url_hash_data: url_hash_data_t = {
+      hash: null,
+      hash_lowercase: null
+    };
+
+    if (url.hash) {
+      url_hash_data.hash = url.hash;
+      url_hash_data.hash_lowercase = url.hash.toLowerCase();
+    }
+
+    return url_hash_data;
   }
 
   private parseHostInfo(params: {
@@ -202,6 +790,11 @@ export class URLParser {
       host_with_protocol: '',
       host_lowercase: '',
       host_with_protocol_lowercase: '',
+      domain: null,
+      domain_with_tld: null,
+      domain_with_subdomains_and_tld: null,
+      top_level_domain: null,
+      subdomains: null,
       host_domain_information_parsed: null
     };
 
@@ -229,7 +822,6 @@ export class URLParser {
         top_level_domains: []
       }
     };
-    // host_info.host_domain_information_parsed
 
     // Note: we type to 'any' here so we can assign to our internal type.  This is
     // done so zod validators can work as desired.  We don't just do an Object.assign
@@ -272,8 +864,44 @@ export class URLParser {
     // only set parse result if we have one
     if (parsed_domain) {
       host_info.host_domain_information_parsed = urlparsed_domain;
+
+      if (urlparsed_domain.domain) host_info.domain = urlparsed_domain.domain;
+
+      if (urlparsed_domain.top_level_domains) {
+        if (urlparsed_domain.top_level_domains.length) {
+          host_info.top_level_domain =
+            urlparsed_domain.top_level_domains.join('.');
+        }
+      }
+
+      if (urlparsed_domain.subdomains) {
+        if (urlparsed_domain.subdomains.length) {
+          host_info.subdomains = urlparsed_domain.subdomains.join('.');
+        }
+      }
     }
-    debugger;
+
+    if (host_info.domain) {
+      // domain + top_level_domain
+      if (host_info.top_level_domain && host_info.top_level_domain) {
+        host_info.domain_with_tld =
+          host_info.domain + '.' + host_info.top_level_domain;
+      }
+
+      // subdomain + domain + top_level_domain
+      if (
+        host_info.subdomains &&
+        host_info.top_level_domain &&
+        host_info.top_level_domain
+      ) {
+        host_info.domain_with_subdomains_and_tld =
+          host_info.subdomains +
+          '.' +
+          host_info.domain +
+          '.' +
+          host_info.top_level_domain;
+      }
+    }
 
     return host_info;
   }
@@ -383,12 +1011,6 @@ export class URLParser {
     if (isEmpty(url.pathname) === true) {
       url_base = params.original_url_string;
     } else {
-      // Don't use this:
-      // url_base = url.href.slice(0, url.href.indexOf(url.pathname));
-      // Why: We use the original url string instead of url.href here due to the
-      // native node URL parser automatically converting the host part to lowercase. For
-      // the sake of accuracy, we want the actual url base rather than the lowercase
-      // version only.
       url_base = params.original_url_string.slice(
         0,
         params.original_url_string.indexOf(url.pathname)
@@ -396,19 +1018,13 @@ export class URLParser {
     }
 
     // original_url_string
-
     base_info.base = url_base;
     base_info.base_lowercase = url_base.toLowerCase();
 
     // generate base without port
     if (parse_data.scheme_and_port_info) {
       // calculate base without port
-      if (
-        stringEndsWith(
-          base_info.base,
-          `:${parse_data.scheme_and_port_info.port}`
-        )
-      ) {
+      if (base_info.base.endsWith(`:${parse_data.scheme_and_port_info.port}`)) {
         base_info.base_without_port = base_info.base.substring(
           0,
           base_info.base.length -
@@ -818,10 +1434,6 @@ export class URLParser {
     // return the path info
     return pathinfo;
   }
-
-  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  // %%% Parameter Parsing %%%%%%%%%%%%%%%%%%%%%%
-  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
   parseParams(params: {
     url: URL;

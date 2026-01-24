@@ -1,21 +1,4 @@
-/**
- * URLFuzzer (corrected design)
- *
- * Design correction:
- * - The `complexity` scalar (0..1) now *consistently* influences generation decisions.
- * - `weightedPick(...)` now uses `complexity` to bias selection toward later (more complex) options.
- *
- * Contract:
- * - genParsableURLs: always parse via `new URL(url)` (Node.js WHATWG URL)
- * - genUnparsableURLs: intended to throw in `new URL(url)` (no base URL)
- */
-
 import type { url_generation_options_t } from '@src/index';
-
-// Example usage:
-// const fuzzer = new URLFuzzer({ seed: 1234, complexity_bias: 0.75, include_tricky_valid_cases: true });
-// console.log(fuzzer.genParsableURLs(10));
-// console.log(fuzzer.genUnparsableURLs(10));
 
 export class URLFuzzer {
   private rng: () => number;
@@ -46,9 +29,9 @@ export class URLFuzzer {
     return out;
   }
 
-  // ----------------------------
-  // Parsable generation
-  // ----------------------------
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% Parsable URL Generation %%%%%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
   private generateParsableUrl(): string {
     const complexity = this.pickComplexity(); // 0..1
@@ -352,9 +335,9 @@ export class URLFuzzer {
     return `#${frag}`;
   }
 
-  // ----------------------------
-  // Unparsable generation
-  // ----------------------------
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  // %%% Unparsable generation %%%%%%%%%%%%%%%%%%%%
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
   private generateUnparsableUrl(): string {
     const pattern = this.pickOne([
