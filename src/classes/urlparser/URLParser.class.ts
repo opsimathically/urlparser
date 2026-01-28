@@ -1,30 +1,31 @@
-import type {
-  urlparse_user_and_password_info_t,
-  urlparse_port_and_protocol_info_t,
-  urlparse_host_info_t,
-  urlparse_base_info_t,
-  urlparsed_domain_result_t,
-  urlparsed_resource_details_t,
-  urlparsed_path_component_t,
-  urlparsed_path_element_details_t,
-  urlparsed_path_and_resource_info_t,
-  urlparsed_indicators_t,
-  urlparsed_path_t,
-  urlparsed_queryparam_t,
-  urlparsed_param_info_t,
-  url_hash_data_t,
-  unusual_url_type_t,
-  data_url_info_t,
-  blob_url_info_t,
-  about_url_info_t,
-  mailto_url_info_t,
-  tel_url_info_t,
-  urn_url_info_t,
-  urlparsed_t
+import {
+  type urlparse_user_and_password_info_t,
+  type urlparse_port_and_protocol_info_t,
+  type urlparse_host_info_t,
+  type urlparse_base_info_t,
+  type urlparsed_domain_result_t,
+  type urlparsed_resource_details_t,
+  type urlparsed_path_component_t,
+  type urlparsed_path_element_details_t,
+  type urlparsed_path_and_resource_info_t,
+  type urlparsed_indicators_t,
+  type urlparsed_path_t,
+  type urlparsed_queryparam_t,
+  type urlparsed_param_info_t,
+  type url_hash_data_t,
+  type unusual_url_type_t,
+  type data_url_info_t,
+  type blob_url_info_t,
+  type about_url_info_t,
+  type mailto_url_info_t,
+  type tel_url_info_t,
+  type urn_url_info_t,
+  type urlparsed_t
 } from '@src/index';
 
 import { isEmpty } from '../../functions/emptyvals/emptyvals';
 import { VerboseURLAnalyticParser } from '../verboseurlanalyticparser/VerboseURLAnalyticParser.class';
+import { AboutURLValidator } from '../abouturlvalidator/AboutURLValidator.class';
 import { parseDomain } from 'parse-domain';
 
 import {
@@ -124,33 +125,14 @@ export class URLParser {
       indicators: {}
     };
 
-    // 1) Use built in URL parser to parse.
-    let parsed_url: URL | null = null;
-    try {
-      // Note:
-      // The url class will fail to parse for erroneous urls.  Things with bad ports, etc, will fail naturally.
-      parsed_url = new URL(url_to_parse, url_to_parse);
-    } catch (err: any) {
-      if (err) {
-        // create diagnostics
-        final_urlparse_data.failed_parse_diagnostics =
-          urlparser_ref.verbose_analytic_parser.analyzeUrl(
-            url_to_parse,
-            url_to_parse
-          );
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Attempt To Detect/Parse Unusual Types %%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-        return final_urlparse_data;
-      }
-    }
-
-    if (!parsed_url || parsed_url?.hostname === '') {
-      // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      // %%% Attempt To Parse Unusual Types %%%%%
-      // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-      const detected_unusual_type = detectUnusualUrlType(
-        url_to_parse.toLowerCase()
-      );
+    const detected_unusual_type = detectUnusualUrlType(
+      url_to_parse.toLowerCase()
+    );
+    if (detected_unusual_type) {
       switch (detected_unusual_type) {
         // parse as a data url
         case 'data_url_type':
@@ -201,13 +183,39 @@ export class URLParser {
         default:
           break;
       }
+    }
 
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Parse "Regular" URLs %%%%%%%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    // 1) Use built in URL parser to parse.
+    let parsed_url: URL | null = null;
+    try {
+      // Note:
+      // The url class will fail to parse for erroneous urls.  Things with bad ports, etc, will fail naturally.
+      parsed_url = new URL(url_to_parse, url_to_parse);
+    } catch (err: any) {
+      if (err) {
+        // create diagnostics
+        final_urlparse_data.failed_parse_diagnostics =
+          urlparser_ref.verbose_analytic_parser.analyzeUrl(
+            url_to_parse,
+            url_to_parse
+          );
+
+        return final_urlparse_data;
+      }
+    }
+
+    if (!parsed_url || parsed_url?.hostname === '') {
       // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
       // %%% Fail If Wasn't Unusual Type %%%%%%%%
       // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-      final_urlparse_data.indicators.has_failures = true;
-      return final_urlparse_data;
+      // if we have no parsable host, the url parser didn't throw an error, and we've
+      // gotten to this point, just return null.
+      return null;
     }
 
     // things like mailto: will give a parsed_url, but won't have a hostname
@@ -280,7 +288,6 @@ export class URLParser {
     // for a URL in the database that contains exact data in an exact position, a hash
     // lookup is often an easier/faster solution than a complex query.
 
-    debugger;
     return final_urlparse_data;
   }
 
@@ -429,6 +436,18 @@ export class URLParser {
   // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
   parseAboutURL(input_url: string): about_url_info_t | null {
+    // About URLs are tricky to validate so we need to prevalidate prior to parsing.
+    const about_validator = new AboutURLValidator({
+      allow_any_identity_bool: true,
+      max_total_length_u32: 1000
+    });
+    const validation_result = about_validator.validate({
+      about_url_str: input_url
+    });
+    if (!validation_result.is_valid_bool) {
+      return null;
+    }
+
     if (typeof input_url !== 'string') return null;
 
     const raw = input_url.trim();
@@ -758,7 +777,6 @@ export class URLParser {
       if (protocol === 'file') indicators.is_file_protocol = true;
     }
 
-    debugger;
     return indicators;
   }
 
@@ -849,13 +867,13 @@ export class URLParser {
       if (parsed_domain.topLevelDomains) {
         urlparsed_domain.top_level_domains = parsed_domain.topLevelDomains;
       }
-      if (parsed_domain.icann.subDomains) {
+      if (parsed_domain?.icann?.subDomains) {
         urlparsed_domain.icann.subdomains = parsed_domain.icann.subDomains;
       }
-      if (parsed_domain.icann.domain) {
+      if (parsed_domain?.icann?.domain) {
         urlparsed_domain.icann.domain = parsed_domain.icann.domain;
       }
-      if (parsed_domain.icann.topLevelDomains) {
+      if (parsed_domain?.icann?.topLevelDomains) {
         urlparsed_domain.icann.top_level_domains =
           parsed_domain.icann.topLevelDomains;
       }
