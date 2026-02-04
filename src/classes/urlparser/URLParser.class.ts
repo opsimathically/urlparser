@@ -25,7 +25,9 @@ import {
 
 import { isEmpty } from '../../functions/emptyvals/emptyvals';
 import { VerboseURLAnalyticParser } from '../verboseurlanalyticparser/VerboseURLAnalyticParser.class';
+import { BlobURLValidator } from '../bloburlvalidator/BlobURLValidator.class';
 import { AboutURLValidator } from '../abouturlvalidator/AboutURLValidator.class';
+import { MailtoURLValidator } from '../mailtourlvalidator/MailtoURLValidator.class';
 import { parseDomain } from 'parse-domain';
 
 import {
@@ -394,6 +396,23 @@ export class URLParser {
     const remainder = raw.slice(5); // everything after "blob:"
     if (remainder.length === 0) return null;
 
+    const blob_validator = new BlobURLValidator({
+      allow_fragment_bool: true,
+      allow_http_bool: true,
+      allow_https_bool: true,
+      allow_non_rfc4122_uuid_bool: true,
+      allow_null_origin_bool: true,
+      allow_query_bool: true,
+      max_total_length_u32: 2048
+    });
+
+    const validation_result = blob_validator.validate({
+      blob_url_str: input_url
+    });
+    if (!validation_result?.is_valid_bool) {
+      return null;
+    }
+
     // Separate off fragment and query from the remainder (do not decode)
     let main_part = remainder;
     let fragment: string | null = null;
@@ -500,6 +519,27 @@ export class URLParser {
 
     // Case-insensitive scheme check
     if (raw.slice(0, 7).toLowerCase() !== 'mailto:') return null;
+
+    const mailto_validator = new MailtoURLValidator({
+      allow_to_header_bool: true,
+      allow_unknown_headers_bool: true,
+      allow_local_only_recipient_bool: true,
+      allow_empty_to_bool: true,
+      max_header_count_u32: 32,
+      max_header_name_length_u32: 512,
+      max_header_value_length_u32: 512,
+      max_recipient_count_u32: 20,
+      max_to_length_u32: 512,
+      max_total_length_u32: 2048
+    });
+
+    const validation_result = mailto_validator.validate({
+      mailto_url_str: input_url
+    });
+
+    if (!validation_result?.is_valid_bool) {
+      return null;
+    }
 
     // Split off fragment first (common in copied URLs, even if not semantically meaningful for mailto)
     const hash_index = raw.indexOf('#');

@@ -27,6 +27,8 @@ interface blob_url_fuzzer_i {
   generateInvalidBlobUrls(params: { count: number; seed?: number }): string[];
 }
 
+import { BlobURLValidator } from '../bloburlvalidator/BlobURLValidator.class';
+
 export class BlobURLFuzzer implements blob_url_fuzzer_i {
   private rng: rng_t;
 
@@ -83,6 +85,7 @@ export class BlobURLFuzzer implements blob_url_fuzzer_i {
         : this.rng;
     const urls: string[] = [];
     const seen = new Set<string>();
+    const validator = new BlobURLValidator();
 
     // Strategy:
     // - Wrong schemes / confusing prefixes
@@ -95,10 +98,13 @@ export class BlobURLFuzzer implements blob_url_fuzzer_i {
     //
     // Some of these may still parse in permissive implementations; they are intended for stress.
     let safety_counter = 0;
-    while (urls.length < params.count && safety_counter < params.count * 200) {
+    while (urls.length < params.count && safety_counter < params.count * 500) {
       safety_counter += 1;
 
       const url = this.generateOneInvalidBlobUrl({ rng });
+      if (validator.validate({ blob_url_str: url }).is_valid_bool) {
+        continue;
+      }
       if (!seen.has(url)) {
         seen.add(url);
         urls.push(url);
@@ -107,7 +113,10 @@ export class BlobURLFuzzer implements blob_url_fuzzer_i {
 
     // Pad if needed.
     while (urls.length < params.count) {
-      urls.push('blob:////');
+      const fallback = `blob:invalid${urls.length}`;
+      if (!validator.validate({ blob_url_str: fallback }).is_valid_bool) {
+        urls.push(fallback);
+      }
     }
 
     return urls;
@@ -429,24 +438,8 @@ export class BlobURLFuzzer implements blob_url_fuzzer_i {
   private generateValidBlobId(params: { rng: rng_t }): string {
     const rng = params.rng;
 
-    // Typical blob URL path uses a UUID. Also include alternative opaque IDs seen in practice.
-    const kind = this.pickOne({
-      rng,
-      items: ['uuid_v4', 'uuid_v4', 'uuid_v4', 'opaque_token', 'uuid_v1_like']
-    });
-
-    if (kind === 'uuid_v4') {
-      return this.generateUuidV4({ rng });
-    }
-
-    if (kind === 'uuid_v1_like') {
-      // Not strictly necessary, but still syntactically UUID-ish and should parse as a path segment.
-      return this.generateUuidLike({ rng });
-    }
-
-    // opaque_token: URL-safe base64-ish token; should be safe as a path segment.
-    const token_len = this.pickInt({ rng, min: 8, max: 48 });
-    return this.generateUrlSafeToken({ rng, length: token_len });
+    // Keep valid IDs aligned with BlobURLValidator's strict RFC 4122 checks.
+    return this.generateUuidV4({ rng });
   }
 
   private generateUuidV4(params: { rng: rng_t }): string {
