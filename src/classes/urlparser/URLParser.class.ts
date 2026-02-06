@@ -28,6 +28,9 @@ import { VerboseURLAnalyticParser } from '../verboseurlanalyticparser/VerboseURL
 import { BlobURLValidator } from '../bloburlvalidator/BlobURLValidator.class';
 import { AboutURLValidator } from '../abouturlvalidator/AboutURLValidator.class';
 import { MailtoURLValidator } from '../mailtourlvalidator/MailtoURLValidator.class';
+import { TelURLValidator } from '../telurlvalidator/TelURLValidator.class';
+import { URNURLValidator } from '../urnurlvalidator/URNURLValidator.class';
+
 import { parseDomain } from 'parse-domain';
 
 import {
@@ -118,12 +121,13 @@ export class URLParser {
   // %%% Main Parse URL %%%%%%%%%%%%%%%%%%%%
   // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-  public parse(url_to_parse: string): urlparsed_t | null {
+  public parse(url_to_parse: string): urlparsed_t {
     // set self ref
     const urlparser_ref = this;
 
     const final_urlparse_data: urlparsed_t = {
       type: 'unset',
+      parsed_ok: false,
       indicators: {}
     };
 
@@ -141,7 +145,11 @@ export class URLParser {
           final_urlparse_data.type = 'data';
           final_urlparse_data.data_url_info =
             urlparser_ref.parseDataURL(url_to_parse);
-          if (!final_urlparse_data.data_url_info) return null;
+          if (!final_urlparse_data.data_url_info) {
+            return final_urlparse_data;
+          } else {
+            final_urlparse_data.parsed_ok = true;
+          }
           return final_urlparse_data;
 
         // parse as a blob url
@@ -149,35 +157,55 @@ export class URLParser {
           final_urlparse_data.type = 'blob';
           final_urlparse_data.blob_url_info =
             urlparser_ref.parseBlobURL(url_to_parse);
-          if (!final_urlparse_data.blob_url_info) return null;
+          if (!final_urlparse_data.blob_url_info) {
+            return final_urlparse_data;
+          } else {
+            final_urlparse_data.parsed_ok = true;
+          }
           return final_urlparse_data;
 
         case 'about_url_type':
           final_urlparse_data.type = 'about';
           final_urlparse_data.about_url_info =
             urlparser_ref.parseAboutURL(url_to_parse);
-          if (!final_urlparse_data.about_url_info) return null;
+          if (!final_urlparse_data.about_url_info) {
+            return final_urlparse_data;
+          } else {
+            final_urlparse_data.parsed_ok = true;
+          }
           return final_urlparse_data;
 
         case 'mailto_url_type':
           final_urlparse_data.type = 'mailto';
           final_urlparse_data.mailto_url_info =
             urlparser_ref.parseMailtoURL(url_to_parse);
-          if (!final_urlparse_data.mailto_url_info) return null;
+          if (!final_urlparse_data.mailto_url_info) {
+            return final_urlparse_data;
+          } else {
+            final_urlparse_data.parsed_ok = true;
+          }
           return final_urlparse_data;
 
         case 'telephone_url_type':
           final_urlparse_data.type = 'telephone';
           final_urlparse_data.tel_url_info =
             urlparser_ref.parseTelephoneURL(url_to_parse);
-          if (!final_urlparse_data.tel_url_info) return null;
+          if (!final_urlparse_data.tel_url_info) {
+            return final_urlparse_data;
+          } else {
+            final_urlparse_data.parsed_ok = true;
+          }
           return final_urlparse_data;
 
         case 'urn_url_type':
           final_urlparse_data.type = 'urn';
           final_urlparse_data.urn_url_info =
             urlparser_ref.parseURNURL(url_to_parse);
-          if (!final_urlparse_data.urn_url_info) return null;
+          if (!final_urlparse_data.urn_url_info) {
+            return final_urlparse_data;
+          } else {
+            final_urlparse_data.parsed_ok = true;
+          }
           return final_urlparse_data;
 
         // unknown types return null
@@ -217,14 +245,13 @@ export class URLParser {
 
       // if we have no parsable host, the url parser didn't throw an error, and we've
       // gotten to this point, just return null.
-      return null;
+      return final_urlparse_data;
     }
 
     // things like mailto: will give a parsed_url, but won't have a hostname
     // if we got this far we know we got problems
-    if (parsed_url.hostname === '') return null;
+    if (parsed_url.hostname === '') return final_urlparse_data;
 
-    if (url_to_parse.toLowerCase().indexOf('mailto') === 0) debugger;
     // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     // %%% Parse Typical URLs %%%%%%%%%%%%%%%%%%
     // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -290,6 +317,27 @@ export class URLParser {
     // for a URL in the database that contains exact data in an exact position, a hash
     // lookup is often an easier/faster solution than a complex query.
 
+    if (final_urlparse_data?.scheme_and_port_info?.protocol) {
+      if (
+        ['http', 'https'].includes(
+          final_urlparse_data.scheme_and_port_info.protocol
+        )
+      ) {
+        final_urlparse_data.type = 'web';
+      } else if (
+        ['ws', 'wss'].includes(
+          final_urlparse_data.scheme_and_port_info.protocol
+        )
+      ) {
+        final_urlparse_data.type = 'websocket';
+      }
+    }
+
+    // set parse marker and return
+    if (final_urlparse_data.type === 'unset')
+      final_urlparse_data.type = 'other';
+
+    final_urlparse_data.parsed_ok = true;
     return final_urlparse_data;
   }
 
@@ -638,6 +686,9 @@ export class URLParser {
       other_query_params[key] = raw_query_params[key];
     }
 
+    // ensure we have at least one "to" entry
+    if (to.length <= 0) return null;
+
     return {
       scheme: 'mailto',
       raw: raw,
@@ -663,6 +714,29 @@ export class URLParser {
 
     // Case-insensitive scheme check
     if (raw.slice(0, 4).toLowerCase() !== 'tel:') return null;
+
+    const tel_validator = new TelURLValidator({
+      allow_dtmf_abcd_bool: true,
+      allow_dtmf_in_ext_bool: true,
+      allow_fragment_bool: true,
+      allow_general_domainname_in_phone_context_bool: true,
+      allow_local_number_bool: true,
+      allow_pct_encoded_in_params_bool: true,
+      allow_query_bool: true,
+      allow_tsp_param_bool: true,
+      allow_unknown_params_bool: true,
+      allow_visual_separators_bool: true,
+      max_total_length_u32: 512,
+      require_phone_context_for_local_bool: false
+    });
+
+    const validation_result = tel_validator.validate({
+      tel_url_str: input_url
+    });
+
+    if (!validation_result?.is_valid_bool) {
+      return null;
+    }
 
     let remainder = raw.slice(4); // everything after "tel:"
 
@@ -715,6 +789,23 @@ export class URLParser {
 
     let remainder = raw.slice(4); // everything after "urn:"
     if (remainder.length === 0) return null;
+
+    const urnurl_validator = new URNURLValidator({
+      allow_any_valid_nid_bool: true,
+      allow_f_component_bool: true,
+      allow_q_component_bool: true,
+      allow_r_component_bool: true,
+      max_total_length_u32: 2048,
+      require_well_formed_pct_encoding_in_nss_bool: false,
+      strict_rfc8141_charset_bool: false
+    });
+
+    const validation_result = urnurl_validator.validate({
+      urn_url_str: input_url
+    });
+    if (!validation_result?.is_valid_bool) {
+      return null;
+    }
 
     // Extract fragment first
     let fragment: string | null = null;

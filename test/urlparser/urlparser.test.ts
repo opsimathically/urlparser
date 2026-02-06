@@ -7,6 +7,7 @@ import {
   AboutURLFuzzer,
   MailtoURLFuzzer
 } from '@src/index';
+import { parse } from 'node:path';
 
 const urlparser = new URLParser();
 
@@ -15,11 +16,20 @@ function uniqueAndSorted(values: string[]): string[] {
   return Array.from(new Set(values)).sort();
 }
 
+// test flags
+const enabled = {
+  blob_url_tests: false,
+  about_url_tests: false,
+  mailto_url_tests: false,
+  tel_url_tests: false,
+  urn_url_tests: false,
+  web_url_tests: true
+};
+
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%% Test Definitions %%%%%%%%%%%%%%%%%%%%%%%
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if (false)
+if (enabled.blob_url_tests)
   test('Blob url parsing tests', async function () {
     const blob_url_fuzzer = new BlobURLFuzzer({});
 
@@ -29,6 +39,7 @@ if (false)
     ]);
 
     const bad_vals: string[] = uniqueAndSorted([
+      'blob:http://54.205.103.92/00000000-0000-0000-0000-00000000000Z',
       'blob:',
       'blob:/',
       'blob://',
@@ -77,19 +88,14 @@ if (false)
       'blob:null/uuid'
     ]);
 
-    /*
-  Detected Invalids:
-  blob:http://54.205.103.92/00000000-0000-0000-0000-00000000000Z
-  */
-
     for (const url of test_urls) {
       const parse_result = urlparser.parse(url);
-      assert.ok(parse_result, `Parser failed static test: ${url}`);
+      assert.ok(parse_result?.parsed_ok, `Parser failed static test: ${url}`);
     }
 
     for (const url of bad_vals) {
       const parse_result = urlparser.parse(url);
-      assert.ok(!parse_result, `Parser failed bad values: ${url}`);
+      assert.ok(!parse_result?.parsed_ok, `Parser failed bad values: ${url}`);
     }
 
     const generated_valid_blobs = blob_url_fuzzer.generateValidBlobUrls({
@@ -97,7 +103,10 @@ if (false)
     });
     for (const blob of generated_valid_blobs) {
       const parse_result = urlparser.parse(blob);
-      assert.ok(parse_result, `Parser failed generated valid: ${blob}`);
+      assert.ok(
+        parse_result?.parsed_ok,
+        `Parser failed generated valid: ${blob}`
+      );
     }
 
     const generated_invalid_blobs = blob_url_fuzzer.generateInvalidBlobUrls({
@@ -105,14 +114,14 @@ if (false)
     });
     for (const blob of generated_invalid_blobs) {
       const parse_result = urlparser.parse(blob);
-      if (parse_result) debugger;
-      assert.ok(!parse_result, `Parser failed generated invalid: ${blob}`);
+      assert.ok(
+        !parse_result?.parsed_ok,
+        `Parser failed generated invalid: ${blob}`
+      );
     }
-
-    debugger;
   });
 
-if (false)
+if (enabled.about_url_tests)
   test('About url parsing tests', async function () {
     const about_url_fuzzer = new AboutURLFuzzer({
       max_component_length_u32: 100,
@@ -120,28 +129,17 @@ if (false)
     });
 
     const test_urls: string[] = uniqueAndSorted([
-      // ' about:blank',
       'ABOUT:blank',
       'About:Blank',
-      // 'about:',
-      // 'about:#',
-      // 'about:###',
-      // 'about:#fragment',
       'about:%62%6C%61%6E%6B',
-      // 'about:////',
-      // 'about:?',
-      // 'about:???',
-      // 'about:?query',
       'about:BLANK',
       'about:CONFIG',
       'about:Reader',
       'about:addons',
       'about:blank',
-      // 'about:blank ',
       'about:blank#',
       'about:blank#top',
       'about:blank?',
-      // 'about:blank?# ',
       'about:config',
       'about:config#network',
       'about:config?filter=network',
@@ -172,26 +170,45 @@ if (false)
       'about:reader#section-2',
       'about:reader/content',
       'about:reader?',
-      // 'about:reader??##',
       'about:reader?url=https%3A%2F%2Fexample.com',
       'about:reader?url=https://example.com',
-      // 'about:reader?url=https://example.com ',
       'about:reader?url=https://example.com#section',
       'about:reader?url=https://example.com&mode=dark',
-      // 'about:reader?url=https://example.com??##',
       'about:sessionrestore',
       'about:settings',
       'about:srcdoc',
       'about:support',
       'about:support#info',
       'about:version'
-      // 'about:中文',
-      //'about:💥'
+    ]);
+
+    const bad_vals: string[] = uniqueAndSorted([
+      ' about:blank',
+      'about:',
+      'about:#',
+      'about:###',
+      'about:#fragment',
+      'about:////',
+      'about:?',
+      'about:???',
+      'about:?query',
+      'about:blank ',
+      'about:blank?# ',
+      'about:reader??##',
+      'about:reader?url=https://example.com ',
+      'about:reader?url=https://example.com??##',
+      'about:中文',
+      'about:💥'
     ]);
 
     for (const url of test_urls) {
       const parse_result = urlparser.parse(url);
-      assert.ok(parse_result, `Parser failed: ${url}`);
+      assert.ok(parse_result?.parsed_ok, `Parser failed (valid): ${url}`);
+    }
+
+    for (const url of bad_vals) {
+      const parse_result = urlparser.parse(url);
+      assert.ok(!parse_result?.parsed_ok, `Parser failed (invalid): ${url}`);
     }
 
     const valid_about_urls = about_url_fuzzer.generateValidAboutUrls({
@@ -199,7 +216,10 @@ if (false)
     });
     for (const about of valid_about_urls) {
       const parse_result = urlparser.parse(about);
-      assert.ok(parse_result, `Parser failed valid tests: ${about}`);
+      assert.ok(
+        parse_result?.parsed_ok,
+        `Parser failed autogenerated (valid): ${about}`
+      );
     }
 
     // try and parse some known invalid urls in order to get the parser to throw exceptions
@@ -215,71 +235,43 @@ if (false)
         const parse_result = urlparser.parse(about);
       } catch (err) {
         if (err) {
-          assert.ok(false, `Parser failed and threw exception: ${about}`);
+          console.log({ err: err });
+          assert.ok(
+            false,
+            `Parser invalid autogenerated threw an exception: ${about}`
+          );
         }
       }
     }
   });
 
-if (false)
+if (enabled.mailto_url_tests)
   test('Mailto url parsing tests', async function () {
     const test_urls: string[] = uniqueAndSorted([
-      // ' mailto:support@example.com',
       'MAILTO:support@example.com',
       'Mailto:support@example.com?Subject=Help',
-      'mAiLtO:?body=Hi',
-      'mailto',
-      'mailto:',
-      // 'mailto: support@example.com',
-      // 'mailto:"Support Team" <support@example.com>',
-      // 'mailto:%22Support%20Team%22%20%3Csupport@example.com%3E',
-      // 'mailto:%22Support%20Team%22%20%3Csupport@example.com%3E?subject=Hi',
-      // 'mailto:,,,',
-      // 'mailto:; ; ;',
-      'mailto:?',
-      // 'mailto:?&&&',
-      'mailto:?body=Hi',
-      'mailto:?body=Hi#frag',
-      'mailto:?subject=Hello',
-      'mailto:?subject=Hello&body=Hi',
-      // 'mailto:?subject=Help&&body=Hello',
-      'mailto:?subject=Help;body=Hello',
-      // 'mailto:Support%20Team%20%3Csupport@example.com%3E',
       'mailto:USER@EXAMPLE.COM',
       'mailto:alice@example.com,bob@example.com',
       'mailto:alice@example.com,bob@example.com,charlie@example.com',
-      //'mailto:alice@example.com,bob@example.com;charlie@example.com',
-      // 'mailto:alice@example.com;bob@example.com',
-      // 'mailto:alice@example.com;bob@example.com,charlie@example.com',
-      // 'mailto:alice@example.com;bob@example.com;charlie@example.com',
       'mailto:support@example.com',
-      // 'mailto:support@example.com ',
-      // 'mailto:support@example.com#frag',
       'mailto:support@example.com?',
-      // 'mailto:support@example.com?&subject=Help',
-      // 'mailto:support@example.com?=value',
-      // 'mailto:support@example.com??subject=Help',
       'mailto:support@example.com?bcc=a@example.com;b@example.com',
       'mailto:support@example.com?bcc=audit@example.com',
       'mailto:support@example.com?body=',
       'mailto:support@example.com?body=Hello',
       'mailto:support@example.com?body=Hello&subject=Help',
-      // 'mailto:support@example.com?body=Line1%0ALine2',
       'mailto:support@example.com?body=Line1&body=Line2',
       'mailto:support@example.com?cc=a@example.com&cc=b@example.com',
       'mailto:support@example.com?cc=team@example.com',
       'mailto:support@example.com?cc=team@example.com&bcc=audit@example.com',
       'mailto:support@example.com?cc=team@example.com&subject=Help&body=Hello',
       'mailto:support@example.com?cc=team@example.com,a@example.com',
-      // 'mailto:support@example.com?subject',
       'mailto:support@example.com?subject=',
       'mailto:support@example.com?subject=%F0%9F%91%8B',
-      // 'mailto:support@example.com?subject=&body',
       'mailto:support@example.com?subject=Hello%20World',
       'mailto:support@example.com?subject=Help',
       'mailto:support@example.com?subject=Help ',
       'mailto:support@example.com?subject=Help#frag',
-      // 'mailto:support@example.com?subject=Help&',
       'mailto:support@example.com?subject=Help&body=Hello',
       'mailto:support@example.com?subject=Help&body=Hello%20there',
       'mailto:support@example.com?subject=Help&cc=team@example.com&body=Hello&bcc=audit@example.com',
@@ -290,11 +282,51 @@ if (false)
       'mailto:user_name@example-domain.com'
     ]);
 
+    const bad_vals: string[] = uniqueAndSorted([
+      ' mailto:support@example.com',
+      'mAiLtO:?body=Hi',
+      'mailto',
+      'mailto:',
+      'mailto: support@example.com',
+      'mailto:"Support Team" <support@example.com>',
+      'mailto:%22Support%20Team%22%20%3Csupport@example.com%3E',
+      'mailto:%22Support%20Team%22%20%3Csupport@example.com%3E?subject=Hi',
+      'mailto:,,,',
+      'mailto:; ; ;',
+      'mailto:?',
+      'mailto:?&&&',
+      'mailto:?body=Hi',
+      'mailto:?body=Hi#frag',
+      'mailto:?subject=Hello',
+      'mailto:?subject=Hello&body=Hi',
+      'mailto:?subject=Help&&body=Hello',
+      'mailto:?subject=Help;body=Hello',
+      'mailto:Support%20Team%20%3Csupport@example.com%3E',
+      'mailto:alice@example.com,bob@example.com;charlie@example.com',
+      'mailto:alice@example.com;bob@example.com',
+      'mailto:alice@example.com;bob@example.com,charlie@example.com',
+      'mailto:alice@example.com;bob@example.com;charlie@example.com',
+      'mailto:support@example.com ',
+      'mailto:support@example.com#frag',
+      'mailto:support@example.com?&subject=Help',
+      'mailto:support@example.com?=value',
+      'mailto:support@example.com??subject=Help',
+      'mailto:support@example.com?body=Line1%0ALine2',
+      'mailto:support@example.com?subject',
+      'mailto:support@example.com?subject=&body',
+      'mailto:support@example.com?subject=Help&'
+    ]);
+
     const mailto_fuzzer = new MailtoURLFuzzer();
 
     for (const url of test_urls) {
       const parse_result = urlparser.parse(url);
-      assert.ok(parse_result, `Mailto static test failed: ${url}`);
+      assert.ok(parse_result?.parsed_ok, `Mailto static test failed: ${url}`);
+    }
+
+    for (const url of bad_vals) {
+      const parse_result = urlparser.parse(url);
+      assert.ok(!parse_result?.parsed_ok, `Mailto static test failed: ${url}`);
     }
 
     const valid_urls = mailto_fuzzer.generateValidMailtoUrls({
@@ -309,168 +341,264 @@ if (false)
       );
     }
 
-    /*
-  "MAILTO:q.ca%5EU%25kDZ!.o1S4.%25Iy
-  @%5BIPv6%3A17ae%3Aefd%5D?x-foo=kJc2.%3AYJQ%3A%40-SgyoaH7o6qh2d5xDCl%2FuJNNFeYiyy-m.DIVze-_7%21K-9gFceZ%2194T9TNGJvfxoRWbjzr%40REXQMYyB%3FBxlAMXucvQm763%20xxk0EURIbSVfU%2C-2wT%2CE%206tT.nm5hSYfkb%2F_&x-foo=jEa4nRM0WMY&subject=ceKUwe2%3Ab4%21r%3Bi&subject=n%5CeAewQGTI4WX%5C2&to=%21KeD%3A%5C3Mfj80"
+    const invalid_urls = mailto_fuzzer.generateInvalidMailtoUrls({
+      count_u32: 1000
+    });
 
-  'MAILTO:q.ca%5EU%25kDZ!.o1S4.%25Iy@%5BIPv6%3A17ae%3Aefd%5D?x-foo=kJc2.%3AYJQ%3A%40-SgyoaH7o6qh2d5xDCl%2FuJNNFeYiyy-m.DIVze-_7%21K-9gFceZ%2194T9TNGJvfxoRWbjzr%40REXQMYyB%3FBxlAMXucvQm763%20xxk0EURIbSVfU%2C-2wT%2CE%206tT.nm5hSYfkb%2F_&x-foo=jEa4nRM0WMY&subject=ceKUwe2%3Ab4%21r%3Bi&subject=n%5CeAewQGTI4WX%5C2&to=%21KeD%3A%5C3Mfj80'
-  */
-
-    /*
-  const invalid_urls = mailto_fuzzer.generateInvalidMailtoUrls({
-    count_u32: 1000
+    for (const url of invalid_urls) {
+      try {
+        const parse_result = urlparser.parse(url);
+      } catch (err) {
+        console.log({ err: err });
+        assert.ok(
+          false,
+          `Invalid mailto testing resulted in an exception: ${url}`
+        );
+      }
+    }
   });
 
-  for (const url of invalid_urls) {
-    const parse_result = urlparser.parse(url);
+if (enabled.tel_url_tests)
+  test('Telphone url parsing tests', async function () {
+    const test_urls: string[] = uniqueAndSorted([
+      'TEL:+15551234567',
+      'TEL:+15551234567;ext=123',
+      'Tel:+15551234567;ext=123',
+      'tEl:5551234567',
+      'tel:(555)123-4567',
+      'tel:+1 (555) 123-4567',
+      'tel:+1 555 123 4567',
+      'tel:+1%20555%20123%204567',
+      'tel:+1(555)123-4567',
+      'tel:+1-555-123-4567',
+      'tel:+1.555.123.4567',
+      'tel:+15551234567',
+      'tel:+15551234567 ;ext=123',
+      'tel:+15551234567; ext=123',
+      'tel:+15551234567;123',
+      'tel:+15551234567;ext =123',
+      'tel:+15551234567;ext=%31%32%33',
+      'tel:+15551234567;ext=123',
+      'tel:+15551234567;ext=123;flag',
+      'tel:+15551234567;ext=123;foo=bar',
+      'tel:+15551234567;ext=123?x=1',
+      'tel:+15551234567;extension=123',
+      'tel:+15551234567;foo',
+      'tel:+15551234567;postd=pp22',
+      'tel:+15551234567?',
+      'tel:+15551234567?x=1',
+      'tel:+15551234567?x=1?y=2',
+      'tel:+44 20 7183 8750',
+      'tel:+442071838750',
+      'tel:+819012345678',
+      'tel:00115551234567',
+      'tel:02071838750',
+      'tel:555-123-4567',
+      'tel:555.123.4567',
+      'tel:5551234567',
+      'tel:5551234567;ext=99'
+    ]);
 
-    debugger;
-  }
-  */
+    const bad_vals: Array<string> = [
+      'tel',
+      'tel:',
+      'tel:   ',
+      'tel:%2B15551234567',
+      'tel:()',
+      'tel:+',
+      'tel:+15551234567,123',
+      'tel:+15551234567,p123',
+      'tel:+15551234567;;;ext=123',
+      'tel:+15551234567;;ext=123',
+      'tel:+15551234567;=123',
+      'tel:+15551234567;ext',
+      'tel:+15551234567;ext=',
+      'tel:+15551234567;ext==123',
+      'tel:+15551234567;extension=123;foo=bar;foo=baz',
+      'tel:+15551234567;foo=',
+      'tel:+15551234567p123',
+      'tel:+15551234567w123',
+      'tel:+1555☎1234567',
+      'tel:+１（５５５）１２３－４５６７',
+      'tel:-',
+      'tel:;;;?&&&',
+      'tel:?x=1'
+    ];
+
+    for (const url of test_urls) {
+      const parse_result = urlparser.parse(url);
+      assert.ok(parse_result, 'Parser failed.');
+    }
+
+    for (const url of bad_vals) {
+      const parse_result = urlparser.parse(url);
+      if (parse_result) if (parse_result.type !== 'mailto') continue;
+      assert.ok(parse_result.parsed_ok, `Parser failed ${url}`);
+    }
   });
 
-test('Telphone url parsing tests', async function () {
-  const test_urls: string[] = uniqueAndSorted([
-    'TEL:+15551234567',
-    'TEL:+15551234567;ext=123',
-    'Tel:+15551234567;ext=123',
-    'tEl:5551234567',
-    'tel',
-    'tel:',
-    'tel:   ',
-    'tel:%2B15551234567',
-    'tel:()',
-    'tel:(555)123-4567',
-    'tel:+',
-    'tel:+1 (555) 123-4567',
-    'tel:+1 555 123 4567',
-    'tel:+1%20555%20123%204567',
-    'tel:+1(555)123-4567',
-    'tel:+1-555-123-4567',
-    'tel:+1.555.123.4567',
-    'tel:+15551234567',
-    'tel:+15551234567 ;ext=123',
-    'tel:+15551234567,123',
-    'tel:+15551234567,p123',
-    'tel:+15551234567; ext=123',
-    'tel:+15551234567;123',
-    'tel:+15551234567;;;ext=123',
-    'tel:+15551234567;;ext=123',
-    'tel:+15551234567;=123',
-    'tel:+15551234567;ext',
-    'tel:+15551234567;ext =123',
-    'tel:+15551234567;ext=',
-    'tel:+15551234567;ext=%31%32%33',
-    'tel:+15551234567;ext=123',
-    'tel:+15551234567;ext=123;flag',
-    'tel:+15551234567;ext=123;foo=bar',
-    'tel:+15551234567;ext=123?x=1',
-    'tel:+15551234567;ext==123',
-    'tel:+15551234567;extension=123',
-    'tel:+15551234567;extension=123;foo=bar;foo=baz',
-    'tel:+15551234567;foo',
-    'tel:+15551234567;foo=',
-    'tel:+15551234567;postd=pp22',
-    'tel:+15551234567?',
-    'tel:+15551234567?x=1',
-    'tel:+15551234567?x=1?y=2',
-    'tel:+15551234567p123',
-    'tel:+15551234567w123',
-    'tel:+1555☎1234567',
-    'tel:+44 20 7183 8750',
-    'tel:+442071838750',
-    'tel:+819012345678',
-    'tel:+１（５５５）１２３－４５６７',
-    'tel:-',
-    'tel:00115551234567',
-    'tel:02071838750',
-    'tel:555-123-4567',
-    'tel:555.123.4567',
-    'tel:5551234567',
-    'tel:5551234567;ext=99',
-    'tel:;;;?&&&',
-    'tel:?x=1'
-  ]);
+if (enabled.urn_url_tests)
+  test('URN parsing tests', async function () {
+    const test_urls: string[] = [
+      'URN:ietf:rfc:3986',
+      'URN:uuid:550e8400-e29b-41d4-a716-446655440000',
+      'UrN:Example:abc',
+      'urn:a:b',
+      'urn:example:%F0%9F%91%8B',
+      'urn:example::abc',
+      'urn:example:a#b',
+      'urn:example:a%2Fb',
+      'urn:example:a%3Ab%3Ac',
+      'urn:example:a/b/c',
+      'urn:example:a:b:c',
+      'urn:example:a:b:c:d:e',
+      'urn:example:a:b:c?x=1&y=2#frag',
+      'urn:example:a?b=c',
+      'urn:example:abc',
+      'urn:example:abc#section',
+      'urn:example:abc::def',
+      'urn:example:abc?',
+      'urn:example:abc??x=1',
+      'urn:example:abc?x=1',
+      'urn:example:abc?x=1#p',
+      'urn:example:abc?x=1?y=2',
+      'urn:example:https://example.com/path',
+      'urn:example:part1:part2:part3',
+      'urn:example:thing?param=value',
+      'urn:example:x',
+      'urn:example:💥',
+      'urn:example:abc#',
+      'urn:example:abc##frag',
+      'urn:foo:bar',
+      'urn:ietf:rfc:2119',
+      'urn:ietf:rfc:3986',
+      'urn:ietf:rfc:3986#page-1',
+      'urn:ietf:rfc:8259',
+      'urn:isbn:0451450523',
+      'urn:isbn:9780131103627',
+      'urn:mpeg:mpeg7:schema:2001',
+      'urn:oid:1.2.840.113549.1.1.11',
+      'urn:oid:2.5.4.3',
+      'urn:uuid:00000000-0000-0000-0000-000000000000',
+      'urn:uuid:550e8400-e29b-41d4-a716-446655440000',
+      'urn:uuid:550e8400-e29b-41d4-a716-446655440000#section',
+      'urn:uuid:550e8400-e29b-41d4-a716-446655440000?download=true',
+      'urn:uuid:550e8400-e29b-41d4-a716-446655440000?x=1#y'
+    ];
 
-  for (const url of test_urls) {
-    const parse_result = urlparser.parse(url);
-    assert.ok(parse_result, 'Parser failed.');
-  }
-});
+    const bad_vals: string[] = uniqueAndSorted([
+      ' urn:ietf:rfc:3986',
+      'urn:ex ample:abc',
+      'urn:example:ab cd',
+      'urn:example:abc?# ',
+      'urn:ietf:rfc:3986 ',
+      'urn:',
+      'urn:example:',
+      'urn:abc',
+      'urn::abc'
+    ]);
 
-test('URN parsing tests', async function () {
-  const test_urls: string[] = uniqueAndSorted([
-    ' urn:ietf:rfc:3986',
-    'URN:ietf:rfc:3986',
-    'URN:uuid:550e8400-e29b-41d4-a716-446655440000',
-    'UrN:Example:abc',
-    'urn:a:b',
-    'urn:ex ample:abc',
-    'urn:example:%F0%9F%91%8B',
-    'urn:example::abc',
-    'urn:example:a#b',
-    'urn:example:a%2Fb',
-    'urn:example:a%3Ab%3Ac',
-    'urn:example:a/b/c',
-    'urn:example:a:b:c',
-    'urn:example:a:b:c:d:e',
-    'urn:example:a:b:c?x=1&y=2#frag',
-    'urn:example:a?b=c',
-    'urn:example:ab cd',
-    'urn:example:abc',
-    'urn:example:abc#',
-    'urn:example:abc##frag',
-    'urn:example:abc#section',
-    'urn:example:abc::def',
-    'urn:example:abc?',
-    'urn:example:abc?# ',
-    'urn:example:abc??x=1',
-    'urn:example:abc?x=1',
-    'urn:example:abc?x=1#p',
-    'urn:example:abc?x=1?y=2',
-    'urn:example:https://example.com/path',
-    'urn:example:part1:part2:part3',
-    'urn:example:thing?param=value',
-    'urn:example:x',
-    'urn:example:💥',
-    'urn:foo:bar',
-    'urn:ietf:rfc:2119',
-    'urn:ietf:rfc:3986',
-    'urn:ietf:rfc:3986 ',
-    'urn:ietf:rfc:3986#page-1',
-    'urn:ietf:rfc:8259',
-    'urn:isbn:0451450523',
-    'urn:isbn:9780131103627',
-    'urn:mpeg:mpeg7:schema:2001',
-    'urn:oid:1.2.840.113549.1.1.11',
-    'urn:oid:2.5.4.3',
-    'urn:uuid:00000000-0000-0000-0000-000000000000',
-    'urn:uuid:550e8400-e29b-41d4-a716-446655440000',
-    'urn:uuid:550e8400-e29b-41d4-a716-446655440000#section',
-    'urn:uuid:550e8400-e29b-41d4-a716-446655440000?download=true',
-    'urn:uuid:550e8400-e29b-41d4-a716-446655440000?x=1#y'
-  ]);
+    for (const url of test_urls) {
+      const parse_result = urlparser.parse(url);
+      assert.ok(parse_result?.parsed_ok, `Parser failed: ${url}`);
+    }
 
-  const bad_vals: string[] = uniqueAndSorted([
-    'urn:',
-    'urn:example:',
-    'urn:abc',
-    'urn::abc'
-  ]);
+    for (const url of bad_vals) {
+      const parse_result = urlparser.parse(url);
+      if (parse_result?.parsed_ok) debugger;
+      assert.ok(!parse_result?.parsed_ok, `Parser failed badval: ${url}.`);
+    }
+  });
 
-  for (const url of test_urls) {
-    const parse_result = urlparser.parse(url);
-    assert.ok(parse_result, 'Parser failed.');
-  }
-
-  for (const url of bad_vals) {
-    const parse_result = urlparser.parse(url);
-    assert.ok(!parse_result, 'Parser failed.');
-  }
-});
-
-if (false)
+if (enabled.web_url_tests)
   test('Test url parser utilizing parsable/unparsable urls generated via fuzzer.', async function () {
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Data URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    const extraction_test_1 = 'data:text/plain;base64,SGVsbG8=';
+    const extraction_test_result_1 = urlparser.parse(extraction_test_1);
+    assert.ok(
+      extraction_test_result_1?.parsed_ok,
+      'Extraction test 1 failed parse.'
+    );
+    assert.ok(
+      extraction_test_result_1?.type === 'data',
+      'Extraction test 1 failed type check.'
+    );
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Blob URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    // test a basic blob url
+    const extraction_test_2 =
+      'blob:https://example.com/550e8400-e29b-41d4-a716-446655440000';
+    const extraction_test_result_2 = urlparser.parse(extraction_test_2);
+    assert.ok(
+      extraction_test_result_2?.parsed_ok,
+      'Extraction test 2 failed parse.'
+    );
+    assert.ok(
+      extraction_test_result_2?.type === 'blob',
+      'Extraction test 2 failed type check.'
+    );
+    assert.ok(
+      extraction_test_result_2?.blob_url_info?.uuid ===
+        '550e8400-e29b-41d4-a716-446655440000',
+      'Extraction test 3 failed uuid check'
+    );
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% About URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    // test a basic about url
+    const extraction_test_3 = 'about:debugging';
+    const extraction_test_result_3 = urlparser.parse(extraction_test_3);
+    assert.ok(
+      extraction_test_result_3?.parsed_ok,
+      'Extraction test 3 failed parse.'
+    );
+    assert.ok(
+      extraction_test_result_3?.type === 'about',
+      'Extraction test 3 failed type check.'
+    );
+    assert.ok(
+      extraction_test_result_3?.about_url_info?.identifier === 'debugging',
+      'Extraction test 3 failed identifier check.'
+    );
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% HTTPS URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    // attempt to parse out an extremely wacky looking url
+    const extraction_test_4 =
+      'https://hey:ThEre@something.someTHING.blah.TEST.co.uk:8842/path1234blah/56hello-there78/////---910---///56HELLO-tHEre78/mOO.PhP?blah!=BLAH1&blAh2=blah3#some-hash_here_whatEVER#someSECOND_HASH_WHAT';
+    const extraction_test_result_4 = urlparser.parse(extraction_test_4);
+    assert.ok(
+      extraction_test_result_4?.parsed_ok,
+      'Extraction test 4 failed parse.'
+    );
+    assert.ok(
+      extraction_test_result_4?.type === 'web',
+      'Extraction test 4 failed type check.'
+    );
+    assert.ok(
+      extraction_test_result_4?.hash_info?.hash ===
+        '#some-hash_here_whatEVER#someSECOND_HASH_WHAT',
+      'Extraction test 4 failed hash check.'
+    );
+    assert.ok(
+      extraction_test_result_4?.host_info?.top_level_domain === 'co.uk',
+      'Extraction test 4 failed tld parse check.'
+    );
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Random Fault Testing %%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
     const url_fuzzer = new URLFuzzer({
       complexity_bias: 1,
       complexity_weighting_strength: 1,
@@ -481,63 +609,24 @@ if (false)
     const parsable_urls = url_fuzzer.genParsableURLs(100);
     const unparsable_urls = url_fuzzer.genUnparsableURLs(100);
 
-    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    // %%% Content Verification Testing %%%%%%%%%%
-    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-    /*
-  chrome://settings
-  edge://inspect
-  mailto:support@example.com
-  tel:+15551234567
-  urn:ietf:rfc:3986
-  */
-
-    // test a basic data url
-    const extraction_test_1 = 'data:text/plain;base64,SGVsbG8=';
-    const extraction_test_result_1 = urlparser.parse(extraction_test_1);
-    debugger;
-
-    // test a basic blob url
-    const extraction_test_2 = 'blob:https://example.com/550e8400-e29b';
-    const extraction_test_result_2 = urlparser.parse(extraction_test_2);
-    debugger;
-
-    // test a basic about url
-    const extraction_test_3 = 'about:debugging';
-    const extraction_test_result_3 = urlparser.parse(extraction_test_3);
-    debugger;
-
-    // test extractions
-    const extraction_test_4 =
-      'https://hey:ThEre@something.someTHING.blah.TEST.co.uk:8842/path1234blah/56hello-there78/////---910---///56HELLO-tHEre78/mOO.PhP?blah!=BLAH1&blAh2=blah3#some-hash_here_whatEVER#someSECOND_HASH_WHAT';
-    const extraction_test_result_4 = urlparser.parse(extraction_test_4);
-    debugger;
-
-    // -> When we get back from bike/swim.
-    // Write a few extraction tests, write checks to ensure that the data is
-    // being generated extracted correctly.
-    const extraction_test_url_2 = 'http://www.hello.com/';
-
-    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    // %%% Random Fault Testing %%%%%%%%%%%%%%%%%%
-    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
     // test random parsables
     for (let idx = 0; idx < parsable_urls.length; idx++) {
       const url = parsable_urls[idx];
-      const parsed_url = urlparser.parse(url);
-      if (parsed_url.indicators.failures.failed_basic_parsing) {
-        debugger;
+      try {
+        urlparser.parse(url);
+      } catch (err) {
+        if (err)
+          assert.ok(false, `Parsing supposedly valid url threw error: ${url}`);
       }
     }
 
     // test random unparsables
     for (let idx = 0; idx < unparsable_urls.length; idx++) {
       const url = unparsable_urls[idx];
-      const parsed_url = urlparser.parse(url);
-      if (!parsed_url.indicators.failures.failed_basic_parsing) {
-        debugger;
+      try {
+        urlparser.parse(url);
+      } catch (err) {
+        if (err) assert.ok(false, `Parsing invalid url threw error: ${url}`);
       }
     }
 

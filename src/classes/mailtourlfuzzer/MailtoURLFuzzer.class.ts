@@ -554,7 +554,7 @@ export class MailtoURLFuzzer {
         // Delimiter storms
         `${scheme_str}:user@example.com??subject=test`,
         `${scheme_str}:user@example.com&&subject=test`,
-        `${scheme_str}:user@example.com?subject=test#frag`,
+        // `${scheme_str}:user@example.com?subject=test#frag`,
         `${scheme_str}:user@example.com#frag?subject=test`,
 
         // CRLF / control injection

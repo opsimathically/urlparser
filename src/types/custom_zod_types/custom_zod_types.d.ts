@@ -425,6 +425,8 @@ export type urlparsed_t = {
     | 'other'
     | 'unset';
 
+  parsed_ok: boolean;
+
   // if it's a data: url
   data_url_info?: data_url_info_t | null;
   // if it's a blob url
