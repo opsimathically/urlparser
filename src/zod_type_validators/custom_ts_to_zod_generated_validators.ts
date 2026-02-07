@@ -102,6 +102,11 @@ export const urlparse_host_info_t_zods = z.object({
     host_with_protocol: z.string(),
     host_lowercase: z.string(),
     host_with_protocol_lowercase: z.string(),
+    domain: z.string().nullable(),
+    domain_with_tld: z.string().nullable(),
+    domain_with_subdomains_and_tld: z.string().nullable(),
+    top_level_domain: z.string().nullable(),
+    subdomains: z.string().nullable(),
     host_domain_information_parsed: urlparsed_domain_result_t_zods.nullable()
 });
 
@@ -110,16 +115,6 @@ export const urlparse_base_info_t_zods = z.object({
     base_lowercase: z.string(),
     base_without_port: z.string(),
     base_without_port_lowercase: z.string()
-});
-
-export const urlparsed_baseinfo_t_zods = z.object({
-    base: z.string(),
-    base_with_port: z.string()
-});
-
-export const urlparsed_resource_t_zods = z.object({
-    name: z.string().nullable(),
-    extension: z.string().nullable()
 });
 
 export const urlparsed_path_charsets_t_zods = z.object({
@@ -214,13 +209,9 @@ export const urlparsed_indicators_t_zods = z.object({
     has_numeric_path: z.boolean().optional(),
     has_numeric_parameters: z.boolean().optional(),
     has_numeric_parameter_names: z.boolean().optional(),
-    has_script_filename_extension: z.boolean().optional(),
+    has_resource_filename_extension: z.boolean().optional(),
     is_protocol_standard_port: z.boolean().optional(),
     has_invalid_tcp_port: z.boolean().optional()
-});
-
-export const urlparse_fail_indicators_t_zods = z.object({
-    url_failed_basic_parse: z.boolean()
 });
 
 export const urlparsed_queryparam_t_zods = z.object({
@@ -257,13 +248,83 @@ export const urlparsed_param_info_t_zods = z.object({
     params_as_array: z.array(urlparsed_queryparam_t_zods)
 });
 
+export const url_hash_data_t_zods = z.object({
+    hash: z.string().nullable(),
+    hash_lowercase: z.string().nullable()
+});
+
+export const unusual_url_type_t_zods = z.union([z.literal("unknown_type"), z.literal("data_url_type"), z.literal("blob_url_type"), z.literal("about_url_type"), z.literal("mailto_url_type"), z.literal("telephone_url_type"), z.literal("urn_url_type"), z.literal("unknown_type")]);
+
+export const data_url_info_t_zods = z.object({
+    scheme: z.literal("data"),
+    media_type: z.string(),
+    charset: z.string().nullable(),
+    is_base64: z.boolean(),
+    data: z.string(),
+    metadata: z.string()
+});
+
+export const blob_url_info_t_zods = z.object({
+    scheme: z.literal("blob"),
+    origin: z.string(),
+    uuid: z.string(),
+    query: z.string().nullable(),
+    fragment: z.string().nullable(),
+    raw: z.string()
+});
+
+export const about_url_info_t_zods = z.object({
+    scheme: z.literal("about"),
+    identifier: z.string(),
+    query: z.string().nullable(),
+    fragment: z.string().nullable(),
+    raw: z.string()
+});
+
+export const mailto_url_info_t_zods = z.object({
+    scheme: z.literal("mailto"),
+    raw: z.string(),
+    to: z.array(z.string()),
+    cc: z.array(z.string()),
+    bcc: z.array(z.string()),
+    subject: z.array(z.string()),
+    body: z.array(z.string()),
+    other_query_params: z.record(z.string(), z.array(z.string())),
+    fragment: z.string().nullable()
+});
+
+export const tel_url_info_t_zods = z.object({
+    scheme: z.literal("tel"),
+    phone_number: z.string(),
+    parameters: z.record(z.string(), z.array(z.string())),
+    raw: z.string()
+});
+
+export const urn_url_info_t_zods = z.object({
+    scheme: z.literal("urn"),
+    nid: z.string(),
+    nss: z.string(),
+    query: z.string().nullable(),
+    fragment: z.string().nullable(),
+    raw: z.string()
+});
+
 export const urlparsed_t_zods = z.object({
+    type: z.union([z.literal("websocket"), z.literal("web"), z.literal("email"), z.literal("service"), z.literal("data"), z.literal("blob"), z.literal("about"), z.literal("mailto"), z.literal("telephone"), z.literal("urn"), z.literal("other"), z.literal("unset")]),
+    parsed_ok: z.boolean(),
+    data_url_info: data_url_info_t_zods.optional().nullable(),
+    blob_url_info: blob_url_info_t_zods.optional().nullable(),
+    about_url_info: about_url_info_t_zods.optional().nullable(),
+    mailto_url_info: mailto_url_info_t_zods.optional().nullable(),
+    tel_url_info: tel_url_info_t_zods.optional().nullable(),
+    urn_url_info: urn_url_info_t_zods.optional().nullable(),
     scheme_and_port_info: urlparse_port_and_protocol_info_t_zods.optional().nullable(),
     user_and_password_info: urlparse_user_and_password_info_t_zods.optional().nullable(),
     host_info: urlparse_host_info_t_zods.optional().nullable(),
     base_info: urlparse_base_info_t_zods.optional().nullable(),
     path_and_resource_info: urlparsed_path_and_resource_info_t_zods.optional().nullable(),
     parameter_info: urlparsed_param_info_t_zods.optional().nullable(),
+    hash_info: url_hash_data_t_zods.optional().nullable(),
     failed_parse_diagnostics: url_diagnostic_result_t_zods.optional().nullable(),
-    indicators: urlparsed_indicators_t_zods
+    indicators: z.any().optional()
 });
