@@ -25,6 +25,7 @@ import {
 
 import { isEmpty } from '../../functions/emptyvals/emptyvals';
 import { VerboseURLAnalyticParser } from '../verboseurlanalyticparser/VerboseURLAnalyticParser.class';
+import { DataURLValidator } from '../dataurlvalidator/DataURLValidator.class';
 import { BlobURLValidator } from '../bloburlvalidator/BlobURLValidator.class';
 import { AboutURLValidator } from '../abouturlvalidator/AboutURLValidator.class';
 import { MailtoURLValidator } from '../mailtourlvalidator/MailtoURLValidator.class';
@@ -362,6 +363,20 @@ export class URLParser {
       return null;
     }
 
+    const data_validator = new DataURLValidator({
+      allow_ascii_whitespace_in_data_bool: true,
+      require_well_formed_pct_encoding_in_data_bool: true,
+      strict_base64_bool: false,
+      strict_media_type_bool: false
+    });
+
+    const validation_result = data_validator.validate({
+      data_url_str: input_url
+    });
+    if (!validation_result?.is_valid_bool) {
+      return null;
+    }
+
     // RFC2397: data:[<mediatype>][;base64],<data>
     // The first comma separates metadata from data payload.
     const comma_index = trimmed_url.indexOf(',');
@@ -503,6 +518,16 @@ export class URLParser {
   // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
   parseAboutURL(input_url: string): about_url_info_t | null {
+    if (typeof input_url !== 'string') return null;
+
+    const raw = input_url.trim();
+    if (raw.length < 6) return null;
+
+    // Case-insensitive scheme check
+    if (raw.slice(0, 6).toLowerCase() !== 'about:') {
+      return null;
+    }
+
     // About URLs are tricky to validate so we need to prevalidate prior to parsing.
     const about_validator = new AboutURLValidator({
       allow_any_identity_bool: true,
@@ -512,16 +537,6 @@ export class URLParser {
       about_url_str: input_url
     });
     if (!validation_result.is_valid_bool) {
-      return null;
-    }
-
-    if (typeof input_url !== 'string') return null;
-
-    const raw = input_url.trim();
-    if (raw.length < 6) return null;
-
-    // Case-insensitive scheme check
-    if (raw.slice(0, 6).toLowerCase() !== 'about:') {
       return null;
     }
 

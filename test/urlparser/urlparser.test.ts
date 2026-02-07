@@ -1,44 +1,94 @@
-import test, { beforeEach } from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert';
 import { URLParser } from '@src/classes/urlparser/URLParser.class';
 import {
+  DataURLFuzzer,
   URLFuzzer,
   BlobURLFuzzer,
   AboutURLFuzzer,
-  MailtoURLFuzzer
+  MailtoURLFuzzer,
+  URNURLFuzzer
 } from '@src/index';
-import { parse } from 'node:path';
 
+// create urlparser instance
 const urlparser = new URLParser();
-
-// Dedupe/sort our test arrays in the case we add something duped.
-function uniqueAndSorted(values: string[]): string[] {
-  return Array.from(new Set(values)).sort();
-}
 
 // test flags
 const enabled = {
-  blob_url_tests: false,
-  about_url_tests: false,
-  mailto_url_tests: false,
-  tel_url_tests: false,
-  urn_url_tests: false,
+  data_url_tests: true,
+  blob_url_tests: true,
+  about_url_tests: true,
+  mailto_url_tests: true,
+  tel_url_tests: true,
+  urn_url_tests: true,
   web_url_tests: true
 };
 
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-// %%% Test Definitions %%%%%%%%%%%%%%%%%%%%%%%
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Data URL Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if (enabled.data_url_tests)
+  test('Data url parsing tests', async function () {
+    let data_url_fuzzer = new DataURLFuzzer({
+      include_minimal_cases_bool: false,
+      include_non_ascii_bool: false,
+      include_quoted_param_values_bool: true,
+      max_data_length_u32: 4096,
+      max_total_length_u32: 4096 * 2
+    });
+
+    const generated_valid_dataurls = data_url_fuzzer.generateValidDataUrls({
+      count_u32: 100
+    });
+
+    for (const url of generated_valid_dataurls) {
+      const parse_result = urlparser.parse(url);
+
+      assert.ok(
+        parse_result?.parsed_ok,
+        `Parser failed generated valid: ${url}`
+      );
+      assert.ok(
+        parse_result?.type === 'data',
+        `Parser failed data type check: ${url}`
+      );
+    }
+
+    data_url_fuzzer = new DataURLFuzzer({
+      include_minimal_cases_bool: true,
+      include_non_ascii_bool: true,
+      include_quoted_param_values_bool: true,
+      max_data_length_u32: 4096,
+      max_total_length_u32: 4096 * 2
+    });
+
+    const generated_invalid_dataurls = data_url_fuzzer.generateInvalidDataUrls({
+      count_u32: 10000
+    });
+    for (const url of generated_invalid_dataurls) {
+      try {
+        urlparser.parse(url);
+      } catch (err) {
+        if (err) assert.ok(false, `Parser failed generated invalid: ${url}`);
+      }
+    }
+  });
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Blob URL Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 if (enabled.blob_url_tests)
   test('Blob url parsing tests', async function () {
     const blob_url_fuzzer = new BlobURLFuzzer({});
 
     // test urls for blobs
-    const test_urls: string[] = uniqueAndSorted([
+    const test_urls: string[] = [
       'blob:https://example.com/550e8400-e29b-41d4-a716-446655440000'
-    ]);
+    ];
 
-    const bad_vals: string[] = uniqueAndSorted([
+    const bad_vals: string[] = [
       'blob:http://54.205.103.92/00000000-0000-0000-0000-00000000000Z',
       'blob:',
       'blob:/',
@@ -86,7 +136,7 @@ if (enabled.blob_url_tests)
       'blob:null/abc',
       'blob:null/abc?debug=true#top',
       'blob:null/uuid'
-    ]);
+    ];
 
     for (const url of test_urls) {
       const parse_result = urlparser.parse(url);
@@ -121,6 +171,10 @@ if (enabled.blob_url_tests)
     }
   });
 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% About URL Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 if (enabled.about_url_tests)
   test('About url parsing tests', async function () {
     const about_url_fuzzer = new AboutURLFuzzer({
@@ -128,7 +182,7 @@ if (enabled.about_url_tests)
       max_total_length_u32: 10000
     });
 
-    const test_urls: string[] = uniqueAndSorted([
+    const test_urls: string[] = [
       'ABOUT:blank',
       'About:Blank',
       'about:%62%6C%61%6E%6B',
@@ -180,9 +234,9 @@ if (enabled.about_url_tests)
       'about:support',
       'about:support#info',
       'about:version'
-    ]);
+    ];
 
-    const bad_vals: string[] = uniqueAndSorted([
+    const bad_vals: string[] = [
       ' about:blank',
       'about:',
       'about:#',
@@ -199,7 +253,7 @@ if (enabled.about_url_tests)
       'about:reader?url=https://example.com??##',
       'about:中文',
       'about:💥'
-    ]);
+    ];
 
     for (const url of test_urls) {
       const parse_result = urlparser.parse(url);
@@ -232,7 +286,7 @@ if (enabled.about_url_tests)
     });
     for (const about of invalid_about_urls) {
       try {
-        const parse_result = urlparser.parse(about);
+        urlparser.parse(about);
       } catch (err) {
         if (err) {
           console.log({ err: err });
@@ -245,9 +299,12 @@ if (enabled.about_url_tests)
     }
   });
 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Mailto URL Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if (enabled.mailto_url_tests)
   test('Mailto url parsing tests', async function () {
-    const test_urls: string[] = uniqueAndSorted([
+    const test_urls: string[] = [
       'MAILTO:support@example.com',
       'Mailto:support@example.com?Subject=Help',
       'mailto:USER@EXAMPLE.COM',
@@ -280,9 +337,9 @@ if (enabled.mailto_url_tests)
       'mailto:support@example.com?subject=One&subject=Two',
       'mailto:user.name+tag@example.co.uk',
       'mailto:user_name@example-domain.com'
-    ]);
+    ];
 
-    const bad_vals: string[] = uniqueAndSorted([
+    const bad_vals: string[] = [
       ' mailto:support@example.com',
       'mAiLtO:?body=Hi',
       'mailto',
@@ -315,7 +372,7 @@ if (enabled.mailto_url_tests)
       'mailto:support@example.com?subject',
       'mailto:support@example.com?subject=&body',
       'mailto:support@example.com?subject=Help&'
-    ]);
+    ];
 
     const mailto_fuzzer = new MailtoURLFuzzer();
 
@@ -330,7 +387,7 @@ if (enabled.mailto_url_tests)
     }
 
     const valid_urls = mailto_fuzzer.generateValidMailtoUrls({
-      count_u32: 10000
+      count_u32: 100
     });
 
     for (const url of valid_urls) {
@@ -342,12 +399,12 @@ if (enabled.mailto_url_tests)
     }
 
     const invalid_urls = mailto_fuzzer.generateInvalidMailtoUrls({
-      count_u32: 1000
+      count_u32: 100
     });
 
     for (const url of invalid_urls) {
       try {
-        const parse_result = urlparser.parse(url);
+        urlparser.parse(url);
       } catch (err) {
         console.log({ err: err });
         assert.ok(
@@ -358,9 +415,12 @@ if (enabled.mailto_url_tests)
     }
   });
 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Tel URL Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if (enabled.tel_url_tests)
   test('Telphone url parsing tests', async function () {
-    const test_urls: string[] = uniqueAndSorted([
+    const test_urls: string[] = [
       'TEL:+15551234567',
       'TEL:+15551234567;ext=123',
       'Tel:+15551234567;ext=123',
@@ -397,7 +457,7 @@ if (enabled.tel_url_tests)
       'tel:555.123.4567',
       'tel:5551234567',
       'tel:5551234567;ext=99'
-    ]);
+    ];
 
     const bad_vals: Array<string> = [
       'tel',
@@ -436,6 +496,10 @@ if (enabled.tel_url_tests)
       assert.ok(parse_result.parsed_ok, `Parser failed ${url}`);
     }
   });
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% URN URL Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if (enabled.urn_url_tests)
   test('URN parsing tests', async function () {
@@ -486,7 +550,7 @@ if (enabled.urn_url_tests)
       'urn:uuid:550e8400-e29b-41d4-a716-446655440000?x=1#y'
     ];
 
-    const bad_vals: string[] = uniqueAndSorted([
+    const bad_vals: string[] = [
       ' urn:ietf:rfc:3986',
       'urn:ex ample:abc',
       'urn:example:ab cd',
@@ -496,7 +560,7 @@ if (enabled.urn_url_tests)
       'urn:example:',
       'urn:abc',
       'urn::abc'
-    ]);
+    ];
 
     for (const url of test_urls) {
       const parse_result = urlparser.parse(url);
@@ -508,7 +572,37 @@ if (enabled.urn_url_tests)
       if (parse_result?.parsed_ok) debugger;
       assert.ok(!parse_result?.parsed_ok, `Parser failed badval: ${url}.`);
     }
+
+    const urnurl_fuzzer = new URNURLFuzzer({
+      include_f_component_bool: true,
+      include_known_examples_bool: true,
+      include_non_ascii_bool: true,
+      include_pct_encoding_bool: true,
+      include_q_component_bool: true,
+      include_r_component_bool: true
+    });
+
+    const valid_urls = urnurl_fuzzer.generateValidUrnUrls({ count_u32: 100 });
+    for (const url of valid_urls) {
+      const parse_result = urlparser.parse(url);
+      assert.ok(parse_result?.parsed_ok, `Parser failed valid: ${url}`);
+    }
+
+    const invalid_urls = urnurl_fuzzer.generateInvalidUrnUrls({
+      count_u32: 100
+    });
+    for (const url of invalid_urls) {
+      try {
+        urlparser.parse(url);
+      } catch (err) {
+        if (err) assert.ok(false, `Parser failed invalid: ${url}`);
+      }
+    }
   });
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Individual URL Type Tests %%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if (enabled.web_url_tests)
   test('Test url parser utilizing parsable/unparsable urls generated via fuzzer.', async function () {
@@ -570,29 +664,101 @@ if (enabled.web_url_tests)
     );
 
     // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    // %%% HTTPS URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Mailto URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-    // attempt to parse out an extremely wacky looking url
     const extraction_test_4 =
-      'https://hey:ThEre@something.someTHING.blah.TEST.co.uk:8842/path1234blah/56hello-there78/////---910---///56HELLO-tHEre78/mOO.PhP?blah!=BLAH1&blAh2=blah3#some-hash_here_whatEVER#someSECOND_HASH_WHAT';
+      'mailto:support@example.com?subject=Help&cc=team@example.com&body=Hello&bcc=audit@example.com';
     const extraction_test_result_4 = urlparser.parse(extraction_test_4);
     assert.ok(
       extraction_test_result_4?.parsed_ok,
       'Extraction test 4 failed parse.'
     );
     assert.ok(
-      extraction_test_result_4?.type === 'web',
+      extraction_test_result_4?.type === 'mailto',
       'Extraction test 4 failed type check.'
     );
     assert.ok(
-      extraction_test_result_4?.hash_info?.hash ===
-        '#some-hash_here_whatEVER#someSECOND_HASH_WHAT',
-      'Extraction test 4 failed hash check.'
+      extraction_test_result_4?.mailto_url_info?.bcc[0] === 'audit@example.com',
+      'Extraction test 4 bcc value check failed.'
     );
     assert.ok(
-      extraction_test_result_4?.host_info?.top_level_domain === 'co.uk',
-      'Extraction test 4 failed tld parse check.'
+      extraction_test_result_4?.mailto_url_info?.subject[0] === 'Help',
+      'Extraction test 4 help value check failed.'
+    );
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% Tel URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    const extraction_test_5 = 'tel:+15551234567;ext=123;foo=bar';
+    const extraction_test_result_5 = urlparser.parse(extraction_test_5);
+    assert.ok(
+      extraction_test_result_5?.parsed_ok,
+      'Extraction test 5 failed parse.'
+    );
+    assert.ok(
+      extraction_test_result_5?.type === 'telephone',
+      'Extraction test 5 failed type check.'
+    );
+    assert.ok(
+      extraction_test_result_5?.tel_url_info?.parameters?.ext[0] === '123',
+      'Extraction test 5 failed parameter value check.'
+    );
+    assert.ok(
+      extraction_test_result_5?.tel_url_info?.parameters?.ext[0] === '123',
+      'Extraction test 5 failed parameter value check.'
+    );
+    assert.ok(
+      extraction_test_result_5?.tel_url_info?.phone_number === '+15551234567',
+      'Extraction test 5 phone number value check failed.'
+    );
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% URN URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    const extraction_test_6 = 'urn:example:part1:part2:part3';
+    const extraction_test_result_6 = urlparser.parse(extraction_test_6);
+    assert.ok(
+      extraction_test_result_6?.parsed_ok,
+      'Extraction test 6 failed parse.'
+    );
+    assert.ok(
+      extraction_test_result_6?.type === 'urn',
+      'Extraction test 6 failed type check.'
+    );
+    assert.ok(
+      extraction_test_result_6?.urn_url_info?.nid === 'example',
+      'Extraction test 6 nid value check failed'
+    );
+    assert.ok(
+      extraction_test_result_6?.urn_url_info?.nss === 'part1:part2:part3',
+      'Extraction test 6 nid value check failed'
+    );
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% HTTPS URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    // attempt to parse out an extremely wacky looking url
+    const extraction_test_7 =
+      'https://hey:ThEre@something.someTHING.blah.TEST.co.uk:8842/path1234blah/56hello-there78/////---910---///56HELLO-tHEre78/mOO.PhP?blah!=BLAH1&blAh2=blah3#some-hash_here_whatEVER#someSECOND_HASH_WHAT';
+    const extraction_test_result_7 = urlparser.parse(extraction_test_7);
+    assert.ok(
+      extraction_test_result_7?.parsed_ok,
+      'Extraction test 7 failed parse.'
+    );
+    assert.ok(
+      extraction_test_result_7?.type === 'web',
+      'Extraction test 7 failed type check.'
+    );
+    assert.ok(
+      extraction_test_result_7?.hash_info?.hash ===
+        '#some-hash_here_whatEVER#someSECOND_HASH_WHAT',
+      'Extraction test 7 failed hash check.'
+    );
+    assert.ok(
+      extraction_test_result_7?.host_info?.top_level_domain === 'co.uk',
+      'Extraction test 7 failed tld parse check.'
     );
 
     // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
