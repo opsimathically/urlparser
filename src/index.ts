@@ -24,6 +24,7 @@ export { MailtoURLFuzzer } from './classes/special_schemes/mailto_urls/MailtoURL
 export { MailtoURLValidator } from './classes/special_schemes/mailto_urls/MailtoURLValidator.class';
 
 // tel (telephone)
+export { TelURLFuzzer } from './classes/special_schemes/telephone_urls/TelURLFuzzer.class';
 export { TelURLValidator } from './classes/special_schemes/telephone_urls/TelURLValidator.class';
 
 // urns

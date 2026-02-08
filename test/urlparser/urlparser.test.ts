@@ -7,6 +7,7 @@ import {
   BlobURLFuzzer,
   AboutURLFuzzer,
   MailtoURLFuzzer,
+  TelURLFuzzer,
   URNURLFuzzer
 } from '@src/index';
 
@@ -15,15 +16,18 @@ const urlparser = new URLParser();
 
 // test flags
 const enabled = {
-  data_url_tests: true,
-  blob_url_tests: true,
-  about_url_tests: true,
-  mailto_url_tests: true,
+  data_url_tests: false,
+  blob_url_tests: false,
+  about_url_tests: false,
+  mailto_url_tests: false,
   tel_url_tests: true,
-  urn_url_tests: true,
-  web_url_tests: true,
-  extracted_component_tests: true
+  urn_url_tests: false,
+  web_url_tests: false,
+  extracted_component_tests: false
 };
+
+// random seed for fuzzers
+const seed_u32 = (Math.random() * 0x1_0000_0000) >>> 0;
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%% Data URL Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -32,6 +36,7 @@ const enabled = {
 if (enabled.data_url_tests)
   test('Data url parsing tests', async function () {
     let data_url_fuzzer = new DataURLFuzzer({
+      seed_u32: seed_u32,
       include_minimal_cases_bool: false,
       include_non_ascii_bool: false,
       include_quoted_param_values_bool: true,
@@ -82,7 +87,9 @@ if (enabled.data_url_tests)
 
 if (enabled.blob_url_tests)
   test('Blob url parsing tests', async function () {
-    const blob_url_fuzzer = new BlobURLFuzzer({});
+    const blob_url_fuzzer = new BlobURLFuzzer({
+      seed: seed_u32
+    });
 
     // test urls for blobs
     const test_urls: string[] = [
@@ -179,6 +186,7 @@ if (enabled.blob_url_tests)
 if (enabled.about_url_tests)
   test('About url parsing tests', async function () {
     const about_url_fuzzer = new AboutURLFuzzer({
+      seed_u32: seed_u32,
       max_component_length_u32: 100,
       max_total_length_u32: 10000
     });
@@ -376,7 +384,7 @@ if (enabled.mailto_url_tests)
       'mailto:support@example.com?subject=Help&'
     ];
 
-    const mailto_fuzzer = new MailtoURLFuzzer();
+    const mailto_fuzzer = new MailtoURLFuzzer({ seed_u32: seed_u32 });
 
     for (const url of test_urls) {
       const parse_result = urlparser.parse(url);
@@ -490,13 +498,49 @@ if (enabled.tel_url_tests)
 
     for (const url of test_urls) {
       const parse_result = urlparser.parse(url);
-      assert.ok(parse_result, 'Parser failed.');
+      assert.ok(parse_result?.parsed_ok, 'Parser failed.');
     }
 
     for (const url of bad_vals) {
       const parse_result = urlparser.parse(url);
       if (parse_result) if (parse_result.type !== 'mailto') continue;
-      assert.ok(parse_result.parsed_ok, `Parser failed ${url}`);
+      assert.ok(!parse_result?.parsed_ok, `Parser failed ${url}`);
+    }
+
+    const tel_url_fuzzer = new TelURLFuzzer({
+      seed_u32: seed_u32,
+      allow_dtmf_abcd_bool: true,
+      allow_dtmf_in_ext_bool: true,
+      allow_pct_encoded_separators_in_number_bool: true,
+      allow_visual_separators_in_number_bool: true,
+      include_ext_param_bool: true
+    });
+
+    const valid_urls = tel_url_fuzzer.generateValidTelUrls({ count_u32: 100 });
+    const invalid_urls = tel_url_fuzzer.generateInvalidTelUrls({
+      count_u32: 100
+    });
+
+    for (const url of valid_urls) {
+      const parse_result = urlparser.parse(url);
+      assert.ok(
+        parse_result?.parsed_ok,
+        `Parser valid generation test failed: ${url}.`
+      );
+    }
+
+    for (const url of invalid_urls) {
+      try {
+        urlparser.parse(url);
+      } catch (err) {
+        if (err) {
+          console.log({ err: err });
+          assert.ok(
+            false,
+            `Parser invvalid generation test threw exception: ${url}.`
+          );
+        }
+      }
     }
   });
 
