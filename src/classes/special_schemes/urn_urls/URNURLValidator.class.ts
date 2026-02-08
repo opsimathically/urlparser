@@ -12,7 +12,7 @@ type urn_url_validation_result_t = {
   normalized_urn_str?: string;
 };
 
-interface urn_url_validator_options_i {
+type urn_url_validator_options_t = {
   max_total_length_u32?: number;
 
   // Component acceptance: URN syntax is "urn:<NID>:<NSS>[?+r][?=q][#f]" per RFC 8141.
@@ -32,7 +32,7 @@ interface urn_url_validator_options_i {
   // If true, allow NID "urn-" prefix (RFC 8141 allows NID beginning with alnum; "urn-" is not special but appears).
   // Included for flexibility; default true (no extra restriction).
   allow_any_valid_nid_bool?: boolean;
-}
+};
 
 export class URNURLValidator {
   private max_total_length_u32: number;
@@ -45,7 +45,7 @@ export class URNURLValidator {
   private strict_rfc8141_charset_bool: boolean;
   private allow_any_valid_nid_bool: boolean;
 
-  public constructor(params: urn_url_validator_options_i = {}) {
+  public constructor(params: urn_url_validator_options_t = {}) {
     this.max_total_length_u32 = params.max_total_length_u32 ?? 4096;
 
     this.allow_r_component_bool = params.allow_r_component_bool ?? true;

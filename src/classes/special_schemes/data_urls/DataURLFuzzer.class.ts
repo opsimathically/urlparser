@@ -1,4 +1,4 @@
-import { DataURLValidator } from '../dataurlvalidator/DataURLValidator.class';
+import { DataURLValidator } from './DataURLValidator.class';
 
 type data_url_fuzzer_options_t = {
   seed_u32?: number;

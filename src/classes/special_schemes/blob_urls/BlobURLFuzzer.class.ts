@@ -1,35 +1,8 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
-/**
- * Blob URL fuzzer.
- *
- * Goals:
- * - Generate "should-parse" blob URLs that a modern, spec-aligned parser should accept.
- * - Generate "should-not-parse" blob URLs that a modern parser should reject, or that stress edge-cases.
- *
- * Notes:
- * - blob URLs have the general form:
- *      blob:<origin>/<uuid-or-opaque-id>
- *   where <origin> is commonly an http(s) origin, and the path is typically a UUID.
- * - This generator intentionally varies origin components, path/UUID forms, and encoding.
- * - This does not attempt to be a fully normative blob URL implementation; it is a fuzz input generator.
- */
-
-// Example usage (remove in production):
-// const fuzzer = new BlobUrlFuzzer({seed: 123});
-// const good = fuzzer.generateValidBlobUrls({count: 20});
-// const bad = fuzzer.generateInvalidBlobUrls({count: 50});
+import { BlobURLValidator } from './BlobURLValidator.class';
 
 type rng_t = () => number;
 
-interface blob_url_fuzzer_i {
-  generateValidBlobUrls(params: { count: number; seed?: number }): string[];
-  generateInvalidBlobUrls(params: { count: number; seed?: number }): string[];
-}
-
-import { BlobURLValidator } from '../bloburlvalidator/BlobURLValidator.class';
-
-export class BlobURLFuzzer implements blob_url_fuzzer_i {
+export class BlobURLFuzzer {
   private rng: rng_t;
 
   public constructor(params: { seed?: number }) {
@@ -444,9 +417,6 @@ export class BlobURLFuzzer implements blob_url_fuzzer_i {
 
   private generateUuidV4(params: { rng: rng_t }): string {
     const rng = params.rng;
-
-    // Generate UUID v4 with correct version and variant bits at string level.
-    const hex = '0123456789abcdef';
 
     const part1 = this.generateHex({ rng, length: 8 });
     const part2 = this.generateHex({ rng, length: 4 });

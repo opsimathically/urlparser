@@ -3,7 +3,7 @@ type about_url_validator_result_t = {
   reason_str?: string;
 };
 
-interface about_url_validator_options_i {
+type about_url_validator_options_t = {
   max_total_length_u32?: number;
   max_identity_length_u32?: number;
   max_path_length_u32?: number;
@@ -18,7 +18,7 @@ interface about_url_validator_options_i {
 
   // If true, accept about://<identity> in addition to about:<identity>.
   allow_about_slash_slash_bool?: boolean;
-}
+};
 
 export class AboutURLValidator {
   private max_total_length_u32: number;
@@ -31,7 +31,7 @@ export class AboutURLValidator {
   private allow_any_identity_bool: boolean;
   private allow_about_slash_slash_bool: boolean;
 
-  public constructor(params: about_url_validator_options_i = {}) {
+  public constructor(params: about_url_validator_options_t = {}) {
     this.max_total_length_u32 = params.max_total_length_u32 ?? 2048;
     this.max_identity_length_u32 = params.max_identity_length_u32 ?? 64;
     this.max_path_length_u32 = params.max_path_length_u32 ?? 1024;

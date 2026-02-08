@@ -2,7 +2,7 @@ type prng_state_t = {
   state_u32: number;
 };
 
-interface mailto_url_fuzzer_options_i {
+type mailto_url_fuzzer_options_t = {
   seed_u32?: number;
 
   max_total_length_u32?: number;
@@ -16,7 +16,7 @@ interface mailto_url_fuzzer_options_i {
 
   // If true, valid generator will sometimes emit internationalized local/domain labels (still URL-escaped where needed).
   allow_smtp_utf8_bool?: boolean;
-}
+};
 
 export class MailtoURLFuzzer {
   private prng_state: prng_state_t;
@@ -32,7 +32,7 @@ export class MailtoURLFuzzer {
 
   private allow_smtp_utf8_bool: boolean;
 
-  public constructor(params: mailto_url_fuzzer_options_i = {}) {
+  public constructor(params: mailto_url_fuzzer_options_t = {}) {
     const seed_u32 = (params.seed_u32 ?? 0x9e3779b9) >>> 0;
 
     this.prng_state = { state_u32: seed_u32 === 0 ? 0x1a2b3c4d : seed_u32 };

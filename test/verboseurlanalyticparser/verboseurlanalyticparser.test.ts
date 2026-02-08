@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { VerboseURLAnalyticParser } from '@src/classes/verboseurlanalyticparser/VerboseURLAnalyticParser.class';
-import { URLFuzzer } from '@src/classes/urlfuzzer/URLFuzzer.class';
+import { VerboseURLAnalyticParser } from '@src/classes/urlparser/VerboseURLAnalyticParser.class';
+import { URLFuzzer } from '@src/classes/urlparser/URLFuzzer.class';
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%% Test Definitions %%%%%%%%%%%%%%%%%%%%%%%

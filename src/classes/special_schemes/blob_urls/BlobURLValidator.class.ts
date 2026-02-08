@@ -7,7 +7,7 @@ type blob_url_validation_result_t = {
   uuid_str?: string; // canonical uuid (lowercased)
 };
 
-interface blob_url_validator_options_i {
+type blob_url_validator_options_t = {
   max_total_length_u32?: number;
 
   // If true, allow "blob:null/<uuid>" (opaque origin serialization).
@@ -24,16 +24,7 @@ interface blob_url_validator_options_i {
 
   // If true, allow non-RFC4122 UUIDs (still enforces a basic hex+dash pattern).
   allow_non_rfc4122_uuid_bool?: boolean;
-}
-
-/*
-
-// Optional convenience wrapper (PascalCase per your convention)
-function ValidateBlobUrl(params: { blob_url_str: string; options_obj?: blob_url_validator_options_i }): blob_url_validation_result_t {
-    const validator_obj = new BlobUrlValidator(params.options_obj ?? {});
-    return validator_obj.validate({ blob_url_str: params.blob_url_str });
-}
-*/
+};
 
 export class BlobURLValidator {
   private max_total_length_u32: number;
@@ -47,7 +38,7 @@ export class BlobURLValidator {
 
   private allow_non_rfc4122_uuid_bool: boolean;
 
-  public constructor(params: blob_url_validator_options_i = {}) {
+  public constructor(params: blob_url_validator_options_t = {}) {
     this.max_total_length_u32 = params.max_total_length_u32 ?? 2048;
 
     this.allow_null_origin_bool = params.allow_null_origin_bool ?? true;

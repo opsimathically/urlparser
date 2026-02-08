@@ -16,7 +16,7 @@ type data_url_validation_result_t = {
   normalized_data_url_str?: string;
 };
 
-interface data_url_validator_options_i {
+type data_url_validator_options_t = {
   max_total_length_u32?: number;
 
   // Limit size of data portion to avoid parser/memory abuse
@@ -33,16 +33,7 @@ interface data_url_validator_options_i {
 
   // If true, require a syntactically valid media type if present (type "/" subtype, params).
   strict_media_type_bool?: boolean;
-}
-
-/*
-
-// Convenience wrapper (PascalCase)
-function ValidateDataUrl(params: { data_url_str: string; options_obj?: data_url_validator_options_i }): data_url_validation_result_t {
-    const validator_obj = new DataUrlValidator(params.options_obj ?? {});
-    return validator_obj.validate({ data_url_str: params.data_url_str });
-}
-*/
+};
 
 export class DataURLValidator {
   private max_total_length_u32: number;
@@ -53,7 +44,7 @@ export class DataURLValidator {
   private require_well_formed_pct_encoding_in_data_bool: boolean;
   private strict_media_type_bool: boolean;
 
-  public constructor(params: data_url_validator_options_i = {}) {
+  public constructor(params: data_url_validator_options_t = {}) {
     this.max_total_length_u32 = params.max_total_length_u32 ?? 1_000_000;
     this.max_data_length_u32 = params.max_data_length_u32 ?? 800_000;
 

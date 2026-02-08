@@ -21,7 +21,8 @@ const enabled = {
   mailto_url_tests: true,
   tel_url_tests: true,
   urn_url_tests: true,
-  web_url_tests: true
+  web_url_tests: true,
+  extracted_component_tests: true
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -300,8 +301,9 @@ if (enabled.about_url_tests)
   });
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-// %%% Mailto URL Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Mailto URL Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 if (enabled.mailto_url_tests)
   test('Mailto url parsing tests', async function () {
     const test_urls: string[] = [
@@ -418,6 +420,7 @@ if (enabled.mailto_url_tests)
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%% Tel URL Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 if (enabled.tel_url_tests)
   test('Telphone url parsing tests', async function () {
     const test_urls: string[] = [
@@ -600,12 +603,53 @@ if (enabled.urn_url_tests)
     }
   });
 
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-// %%% Individual URL Type Tests %%%%%%%%%%%%%%%%%%%%%%%%%
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Web URL Type Tests %%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if (enabled.web_url_tests)
-  test('Test url parser utilizing parsable/unparsable urls generated via fuzzer.', async function () {
+  test('Web url parsing tests.', async function () {
+    const url_fuzzer = new URLFuzzer({
+      complexity_bias: 1,
+      complexity_weighting_strength: 1,
+      include_tricky_valid_cases: true
+    });
+
+    // generate parsable/unparsable urls
+    const parsable_urls = url_fuzzer.genParsableURLs(100);
+    const unparsable_urls = url_fuzzer.genUnparsableURLs(100);
+
+    // test random parsables
+    for (let idx = 0; idx < parsable_urls.length; idx++) {
+      const url = parsable_urls[idx];
+      try {
+        urlparser.parse(url);
+      } catch (err) {
+        if (err)
+          assert.ok(false, `Parsing supposedly valid url threw error: ${url}`);
+      }
+    }
+
+    // test random unparsables
+    for (let idx = 0; idx < unparsable_urls.length; idx++) {
+      const url = unparsable_urls[idx];
+      try {
+        urlparser.parse(url);
+      } catch (err) {
+        if (err) assert.ok(false, `Parsing invalid url threw error: ${url}`);
+      }
+    }
+
+    // record set should be empty array now
+    assert(true);
+  });
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%% Extracted Component Tests %%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if (enabled.extracted_component_tests)
+  test('Extracted component tests.', async function () {
     // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     // %%% Data URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -761,41 +805,29 @@ if (enabled.web_url_tests)
       'Extraction test 7 failed tld parse check.'
     );
 
-    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    // %%% Random Fault Testing %%%%%%%%%%%%%%%%%%
-    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%% HTTPS URL Test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    const url_fuzzer = new URLFuzzer({
-      complexity_bias: 1,
-      complexity_weighting_strength: 1,
-      include_tricky_valid_cases: true
-    });
-
-    // generate parsable/unparsable urls
-    const parsable_urls = url_fuzzer.genParsableURLs(100);
-    const unparsable_urls = url_fuzzer.genUnparsableURLs(100);
-
-    // test random parsables
-    for (let idx = 0; idx < parsable_urls.length; idx++) {
-      const url = parsable_urls[idx];
-      try {
-        urlparser.parse(url);
-      } catch (err) {
-        if (err)
-          assert.ok(false, `Parsing supposedly valid url threw error: ${url}`);
-      }
-    }
-
-    // test random unparsables
-    for (let idx = 0; idx < unparsable_urls.length; idx++) {
-      const url = unparsable_urls[idx];
-      try {
-        urlparser.parse(url);
-      } catch (err) {
-        if (err) assert.ok(false, `Parsing invalid url threw error: ${url}`);
-      }
-    }
-
-    // record set should be empty array now
-    assert(true);
+    // attempt to parse out an extremely wacky looking url
+    const extraction_test_8 =
+      'wss://hey:ThEre@something.someTHING.blah.TEST.co.uk:8842/path1234blah/56hello-there78/////---910---///56HELLO-tHEre78/mOO.PhP?blah!=BLAH1&blAh2=blah3#some-hash_here_whatEVER#someSECOND_HASH_WHAT';
+    const extraction_test_result_8 = urlparser.parse(extraction_test_8);
+    assert.ok(
+      extraction_test_result_8?.parsed_ok,
+      'Extraction test 8 failed parse.'
+    );
+    assert.ok(
+      extraction_test_result_8?.type === 'websocket',
+      'Extraction test 8 failed type check.'
+    );
+    assert.ok(
+      extraction_test_result_8?.hash_info?.hash ===
+        '#some-hash_here_whatEVER#someSECOND_HASH_WHAT',
+      'Extraction test 8 failed hash check.'
+    );
+    assert.ok(
+      extraction_test_result_8?.host_info?.top_level_domain === 'co.uk',
+      'Extraction test 8 failed tld parse check.'
+    );
   });

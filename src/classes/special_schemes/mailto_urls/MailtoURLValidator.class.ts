@@ -10,7 +10,7 @@ type mailto_validation_result_t = {
   headers_map?: Map<string, string[]>; // lowercased header-name -> decoded values (may repeat)
 };
 
-interface mailto_url_validator_options_i {
+type mailto_url_validator_options_t = {
   max_total_length_u32?: number;
   max_to_length_u32?: number;
   max_recipient_count_u32?: number;
@@ -32,12 +32,12 @@ interface mailto_url_validator_options_i {
 
   // If provided, overrides default allowed headers list.
   allowed_headers_arr?: string[];
-}
+};
 
 /*
 
 // Optional convenience wrapper (PascalCase per your convention)
-function ValidateMailtoUrl(params: { mailto_url_str: string; options_obj?: mailto_url_validator_options_i }): mailto_validation_result_t {
+function ValidateMailtoUrl(params: { mailto_url_str: string; options_obj?: mailto_url_validator_options_t }): mailto_validation_result_t {
     const validator_obj = new MailtoUrlValidator(params.options_obj ?? {});
     return validator_obj.validate({ mailto_url_str: params.mailto_url_str });
 }
@@ -57,7 +57,7 @@ export class MailtoURLValidator {
   private allow_unknown_headers_bool: boolean;
   private allowed_headers_set: Set<string>;
 
-  public constructor(params: mailto_url_validator_options_i = {}) {
+  public constructor(params: mailto_url_validator_options_t = {}) {
     this.max_total_length_u32 = params.max_total_length_u32 ?? 2048;
     this.max_to_length_u32 = params.max_to_length_u32 ?? 1024;
     this.max_recipient_count_u32 = params.max_recipient_count_u32 ?? 32;

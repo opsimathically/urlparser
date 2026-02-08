@@ -14,7 +14,7 @@ type tel_url_validation_result_t = {
   tsp_str?: string; // decoded tsp
 };
 
-interface tel_url_validator_options_i {
+type tel_url_validator_options_t = {
   max_total_length_u32?: number;
 
   allow_local_number_bool?: boolean;
@@ -34,18 +34,7 @@ interface tel_url_validator_options_i {
   allow_tsp_param_bool?: boolean; // allow ;tsp=
   // If true, phone-context domainname validation is more permissive than LDH-only
   allow_general_domainname_in_phone_context_bool?: boolean;
-}
-
-/*
-
-
-// Convenience wrapper (PascalCase)
-function ValidateTelUrl(params: { tel_url_str: string; options_obj?: tel_url_validator_options_i }): tel_url_validation_result_t {
-    const validator_obj = new TelUrlValidator(params.options_obj ?? {});
-    return validator_obj.validate({ tel_url_str: params.tel_url_str });
-}
-
-*/
+};
 
 export class TelURLValidator {
   private max_total_length_u32: number;
@@ -66,7 +55,7 @@ export class TelURLValidator {
   private allow_tsp_param_bool: boolean;
   private allow_general_domainname_in_phone_context_bool: boolean;
 
-  public constructor(params: tel_url_validator_options_i = {}) {
+  public constructor(params: tel_url_validator_options_t = {}) {
     this.max_total_length_u32 = params.max_total_length_u32 ?? 2048;
 
     this.allow_local_number_bool = params.allow_local_number_bool ?? true;
@@ -282,7 +271,7 @@ export class TelURLValidator {
     let in_parens_bool = false;
     let saw_digit_in_parens_bool = false;
 
-    let last_was_digit_bool = false;
+    // let last_was_digit_bool = false;
     let last_was_sep_bool = false;
     let last_sep_char_str: string | null = null;
 
@@ -295,7 +284,7 @@ export class TelURLValidator {
         digits_only_str += ch_str;
         saw_digit_bool = true;
 
-        last_was_digit_bool = true;
+        // last_was_digit_bool = true;
         last_was_sep_bool = false;
         last_sep_char_str = null;
 
@@ -333,7 +322,7 @@ export class TelURLValidator {
         in_parens_bool = true;
         saw_digit_in_parens_bool = false;
 
-        last_was_digit_bool = false;
+        // last_was_digit_bool = false;
         last_was_sep_bool = true;
         last_sep_char_str = '(';
         continue;
@@ -350,7 +339,7 @@ export class TelURLValidator {
 
         in_parens_bool = false;
 
-        last_was_digit_bool = false;
+        // last_was_digit_bool = false;
         last_was_sep_bool = true;
         last_sep_char_str = ')';
         continue;
@@ -371,7 +360,7 @@ export class TelURLValidator {
           };
         }
 
-        last_was_digit_bool = false;
+        // last_was_digit_bool = false;
         last_was_sep_bool = true;
         last_sep_char_str = ch_str;
         continue;

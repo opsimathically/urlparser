@@ -1,4 +1,4 @@
-import { URNURLValidator } from '../urnurlvalidator/URNURLValidator.class';
+import { URNURLValidator } from './URNURLValidator.class';
 
 type urn_url_fuzzer_options_t = {
   seed_u32?: number;

@@ -24,13 +24,13 @@ import {
 } from '@src/index';
 
 import { isEmpty } from '../../functions/emptyvals/emptyvals';
-import { VerboseURLAnalyticParser } from '../verboseurlanalyticparser/VerboseURLAnalyticParser.class';
-import { DataURLValidator } from '../dataurlvalidator/DataURLValidator.class';
-import { BlobURLValidator } from '../bloburlvalidator/BlobURLValidator.class';
-import { AboutURLValidator } from '../abouturlvalidator/AboutURLValidator.class';
-import { MailtoURLValidator } from '../mailtourlvalidator/MailtoURLValidator.class';
-import { TelURLValidator } from '../telurlvalidator/TelURLValidator.class';
-import { URNURLValidator } from '../urnurlvalidator/URNURLValidator.class';
+import { VerboseURLAnalyticParser } from './VerboseURLAnalyticParser.class';
+import { DataURLValidator } from '../special_schemes/data_urls/DataURLValidator.class';
+import { BlobURLValidator } from '../special_schemes/blob_urls/BlobURLValidator.class';
+import { AboutURLValidator } from '../special_schemes/about_urls/AboutURLValidator.class';
+import { MailtoURLValidator } from '../special_schemes/mailto_urls/MailtoURLValidator.class';
+import { TelURLValidator } from '../special_schemes/telephone_urls/TelURLValidator.class';
+import { URNURLValidator } from '../special_schemes/urn_urls/URNURLValidator.class';
 
 import { parseDomain } from 'parse-domain';
 
@@ -75,40 +75,6 @@ export const urlparser_tcp_ports_by_scheme: Record<string, number> = {
   'xmpp-server': 5269
 };
 
-function detectUnusualUrlType(input_url: string): unusual_url_type_t {
-  if (typeof input_url !== 'string') {
-    return 'unknown_type';
-  }
-
-  const normalized_url = input_url.trim().toLowerCase();
-
-  if (normalized_url.startsWith('data:')) {
-    return 'data_url_type';
-  }
-
-  if (normalized_url.startsWith('blob:')) {
-    return 'blob_url_type';
-  }
-
-  if (normalized_url.startsWith('about:')) {
-    return 'about_url_type';
-  }
-
-  if (normalized_url.startsWith('mailto:')) {
-    return 'mailto_url_type';
-  }
-
-  if (normalized_url.startsWith('tel:')) {
-    return 'telephone_url_type';
-  }
-
-  if (normalized_url.startsWith('urn:')) {
-    return 'urn_url_type';
-  }
-
-  return 'unknown_type';
-}
-
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%% URL Parser %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -136,9 +102,10 @@ export class URLParser {
     // %%% Attempt To Detect/Parse Unusual Types %%%
     // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    const detected_unusual_type = detectUnusualUrlType(
+    const detected_unusual_type = this.sniffUnusualUrlType(
       url_to_parse.toLowerCase()
     );
+
     if (detected_unusual_type) {
       switch (detected_unusual_type) {
         // parse as a data url
@@ -345,6 +312,40 @@ export class URLParser {
   // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   // %%% Internal Private Methods %%%%%%%%%%%%%%%
   // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  sniffUnusualUrlType(input_url: string): unusual_url_type_t {
+    if (typeof input_url !== 'string') {
+      return 'unknown_type';
+    }
+
+    const normalized_url = input_url.trim().toLowerCase();
+
+    if (normalized_url.startsWith('data:')) {
+      return 'data_url_type';
+    }
+
+    if (normalized_url.startsWith('blob:')) {
+      return 'blob_url_type';
+    }
+
+    if (normalized_url.startsWith('about:')) {
+      return 'about_url_type';
+    }
+
+    if (normalized_url.startsWith('mailto:')) {
+      return 'mailto_url_type';
+    }
+
+    if (normalized_url.startsWith('tel:')) {
+      return 'telephone_url_type';
+    }
+
+    if (normalized_url.startsWith('urn:')) {
+      return 'urn_url_type';
+    }
+
+    return 'unknown_type';
+  }
 
   // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   // %%% Data URL Parsing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
